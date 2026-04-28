@@ -32,6 +32,9 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
         run: python scripts/fetch_sol_data.py
 
+      - name: Fetch XRPL data
+        run: python scripts/fetch_xrpl_data.py
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
