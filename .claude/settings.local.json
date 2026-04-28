@@ -7,7 +7,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\$env:USERNAME\\\\AppData\\\\Local\\\\Programs\\\\\" -ErrorAction SilentlyContinue | Select-Object Name)",
       "PowerShell($regPaths = @\\(\"HKCU:\\\\Software\\\\Python\\\\PythonCore\\\\3.12\\\\InstallPath\", \"HKLM:\\\\Software\\\\Python\\\\PythonCore\\\\3.12\\\\InstallPath\"\\); foreach \\($p in $regPaths\\) { if \\(Test-Path $p\\) { Get-ItemProperty $p } })",
       "PowerShell($python = \"C:\\\\Users\\\\Utilisateur\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\"; & $python -m pip install requests)",
-      "PowerShell($env:ETHERSCAN_API_KEY = \"TA_CLE\"; & \"C:\\\\Users\\\\Utilisateur\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" \"E:\\\\Claude\\\\soge\\\\scripts\\\\fetch_data.py\")"
+      "PowerShell($env:ETHERSCAN_API_KEY = \"TA_CLE\"; & \"C:\\\\Users\\\\Utilisateur\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" \"E:\\\\Claude\\\\soge\\\\scripts\\\\fetch_data.py\")",
+      "WebFetch(domain:pro-api.solscan.io)",
+      "WebFetch(domain:docs.solscan.io)"
     ]
   }
 }

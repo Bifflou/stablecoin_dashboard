@@ -22,10 +22,15 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Fetch data
+      - name: Fetch Ethereum data
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         run: python scripts/fetch_data.py
+
+      - name: Fetch Solana data
+        env:
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+        run: python scripts/fetch_sol_data.py
 
       - name: Commit and push
         run: |
