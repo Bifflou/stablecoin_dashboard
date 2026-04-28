@@ -35,6 +35,9 @@ jobs:
       - name: Fetch XRPL data
         run: python scripts/fetch_xrpl_data.py
 
+      - name: Fetch Stellar data
+        run: python scripts/fetch_stellar_data.py
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
