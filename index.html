@@ -40,14 +40,12 @@
       color: #8b949e;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      margin-bottom: 1.25rem;
     }
 
     .chart-wrap { position: relative; height: 340px; }
 
     #last-updated { margin-top: 2rem; font-size: 0.75rem; color: #484f58; }
 
-    /* Currency toggle */
     .card-header {
       display: flex;
       align-items: center;
@@ -55,7 +53,11 @@
       margin-bottom: 1.25rem;
     }
 
-    .card-header h2 { margin-bottom: 0; }
+    .card-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
     .toggle-wrap {
       display: flex;
@@ -67,6 +69,9 @@
     }
 
     .toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       background: none;
       border: none;
       color: #8b949e;
@@ -83,6 +88,8 @@
       background: #21262d;
       color: #f0f6fc;
     }
+
+    .toggle-btn svg { display: block; }
 
     /* External tooltip */
     .chart-tooltip {
@@ -109,7 +116,7 @@
       border-bottom: 1px solid #30363d;
     }
 
-    .tt-date { color: #8b949e; font-size: 0.78rem; }
+    .tt-date  { color: #8b949e; font-size: 0.78rem; }
     .tt-total { color: #f0f6fc; font-weight: 700; font-size: 0.9rem; white-space: nowrap; }
 
     .tt-row {
@@ -119,7 +126,7 @@
       margin-top: 5px;
     }
 
-    .tt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .tt-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .tt-label { color: #8b949e; flex: 1; }
     .tt-value { color: #e6edf3; font-weight: 500; white-space: nowrap; }
   </style>
@@ -134,15 +141,48 @@
     <div class="card">
       <div class="card-header">
         <h2 id="mcap-title">Market Capitalisation (USD)</h2>
-        <div class="toggle-wrap">
-          <button class="toggle-btn active" id="btn-usd" onclick="setCurrency('USD')">USD</button>
-          <button class="toggle-btn"        id="btn-eur" onclick="setCurrency('EUR')">EUR</button>
+        <div class="card-controls">
+          <!-- chart-type toggle -->
+          <div class="toggle-wrap">
+            <button class="toggle-btn active" id="mcap-btn-line" onclick="setMcapView('line')" title="Courbe">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="toggle-btn" id="mcap-btn-pie" onclick="setMcapView('pie')" title="Camembert">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/>
+              </svg>
+            </button>
+          </div>
+          <!-- currency toggle -->
+          <div class="toggle-wrap" id="mcap-currency-toggle">
+            <button class="toggle-btn active" id="btn-usd" onclick="setCurrency('USD')">USD</button>
+            <button class="toggle-btn"        id="btn-eur" onclick="setCurrency('EUR')">EUR</button>
+          </div>
         </div>
       </div>
       <div class="chart-wrap"><canvas id="chart-mcap"></canvas></div>
     </div>
+
     <div class="card">
-      <h2>Nombre de Holders</h2>
+      <div class="card-header">
+        <h2>Nombre de Holders</h2>
+        <div class="toggle-wrap">
+          <button class="toggle-btn active" id="holders-btn-line" onclick="setHoldersView('line')" title="Courbe">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="toggle-btn" id="holders-btn-pie" onclick="setHoldersView('pie')" title="Camembert">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/>
+            </svg>
+          </button>
+        </div>
+      </div>
       <div class="chart-wrap"><canvas id="chart-holders"></canvas></div>
     </div>
   </div>
@@ -151,15 +191,15 @@
 
   <script>
     const CHAINS = [
-      { label: 'Ethereum',   color: '#627EEA', mcapFile: 'data/marketcap.json',      holdersFile: 'data/holders.json' },
-      { label: 'Solana',     color: '#9945FF', mcapFile: 'data/sol_marketcap.json',   holdersFile: 'data/sol_holders.json' },
-      { label: 'XRP Ledger', color: '#00B4A0', mcapFile: 'data/xrpl_marketcap.json',     holdersFile: 'data/xrpl_holders.json' },
+      { label: 'Ethereum',   color: '#627EEA', mcapFile: 'data/marketcap.json',       holdersFile: 'data/holders.json' },
+      { label: 'Solana',     color: '#9945FF', mcapFile: 'data/sol_marketcap.json',    holdersFile: 'data/sol_holders.json' },
+      { label: 'XRP Ledger', color: '#00B4A0', mcapFile: 'data/xrpl_marketcap.json',   holdersFile: 'data/xrpl_holders.json' },
       { label: 'Stellar',    color: '#2D9CDB', mcapFile: 'data/stellar_marketcap.json', holdersFile: 'data/stellar_holders.json' },
     ];
 
-    // Formatters
+    // ── Formatters ──────────────────────────────────────────────────────────────
     function fmtSpaced(v) {
-      return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     }
 
     function fmtUSD(v)  { return '$ ' + fmtSpaced(v); }
@@ -184,7 +224,7 @@
       return `${d}/${m}/${String(y).slice(2)}`;
     }
 
-    // Data: union dates + forward-fill + dynamic sort
+    // ── Stacked area helpers ────────────────────────────────────────────────────
     function buildStacked(seriesArr, valueKey) {
       const paired = CHAINS.map((chain, i) => ({
         chain,
@@ -210,7 +250,7 @@
       return { labels: allDates.map(fmtDate), rawDates: allDates, paired, filled };
     }
 
-    // External tooltip
+    // External tooltip for line charts
     function makeTooltipHandler(fmtVal, paired) {
       return function({ chart, tooltip }) {
         let el = chart._ttEl;
@@ -258,8 +298,9 @@
       };
     }
 
-    // Chart builder — returns Chart instance
-    function buildChart(canvasId, { labels, paired, filled }, fmtVal, fmtAxis) {
+    // ── Line chart ──────────────────────────────────────────────────────────────
+    function buildLineChart(canvasId, stackedData, fmtVal, fmtAxis) {
+      const { labels, paired, filled } = stackedData;
       const ctx = document.getElementById(canvasId).getContext('2d');
 
       const datasets = [...paired].reverse().map((p, revIdx) => {
@@ -292,77 +333,150 @@
               display: true,
               position: 'top',
               align: 'end',
-              labels: {
-                color: '#8b949e',
-                usePointStyle: true,
-                pointStyle: 'circle',
-                boxWidth: 8,
-                padding: 16,
-                font: { size: 12 },
-              },
+              labels: { color: '#8b949e', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, font: { size: 12 } },
             },
-            tooltip: {
-              enabled: false,
-              external: makeTooltipHandler(fmtVal, paired),
-            },
+            tooltip: { enabled: false, external: makeTooltipHandler(fmtVal, paired) },
           },
           scales: {
-            x: {
-              ticks: { color: '#8b949e', maxTicksLimit: 8, maxRotation: 0 },
-              grid: { color: '#21262d' },
+            x: { ticks: { color: '#8b949e', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#21262d' } },
+            y: { stacked: true, beginAtZero: true, ticks: { color: '#8b949e', callback: fmtAxis }, grid: { color: '#21262d' } },
+          },
+        },
+      });
+    }
+
+    // ── Doughnut chart ──────────────────────────────────────────────────────────
+    // Shows the latest known value per active chain.
+    function getLatestValues(seriesArr, valueKey) {
+      return seriesArr.map(series => {
+        if (!series || !series.length) return 0;
+        for (let i = series.length - 1; i >= 0; i--) {
+          const v = series[i][valueKey];
+          if (v != null && v > 0) return v;
+        }
+        return 0;
+      });
+    }
+
+    function buildDoughnutChart(canvasId, seriesArr, valueKey, fmtVal) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      const values = getLatestValues(seriesArr, valueKey);
+      const active = CHAINS.map((chain, i) => ({ chain, value: values[i] })).filter(d => d.value > 0);
+      const total  = active.reduce((s, d) => s + d.value, 0);
+
+      return new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: active.map(d => d.chain.label),
+          datasets: [{
+            data: active.map(d => d.value),
+            backgroundColor: active.map(d => d.chain.color + 'B3'),
+            borderColor: active.map(d => d.chain.color),
+            borderWidth: 1.5,
+            hoverOffset: 10,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '58%',
+          plugins: {
+            legend: {
+              display: true,
+              position: 'right',
+              labels: { color: '#8b949e', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, font: { size: 12 } },
             },
-            y: {
-              stacked: true,
-              beginAtZero: true,
-              ticks: { color: '#8b949e', callback: fmtAxis },
-              grid: { color: '#21262d' },
+            tooltip: {
+              backgroundColor: '#1c2128',
+              borderColor: '#30363d',
+              borderWidth: 1,
+              titleColor: '#8b949e',
+              bodyColor: '#e6edf3',
+              padding: 10,
+              callbacks: {
+                label: ctx => {
+                  const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : '0.0';
+                  return `  ${fmtVal(ctx.raw)}  (${pct}%)`;
+                },
+              },
             },
           },
         },
       });
     }
 
-    // Currency toggle state
-    let currentCurrency = 'USD';
-    let mcapSeriesData = null;
-    let mcapChartInstance = null;
+    // ── State ───────────────────────────────────────────────────────────────────
+    let currentCurrency  = 'USD';
+    let mcapViewMode     = 'line';
+    let holdersViewMode  = 'line';
+    let mcapSeriesData   = null;
+    let holdersSeriesData = null;
+    let mcapChartInstance    = null;
+    let holdersChartInstance = null;
+
+    function rebuildMcap() {
+      if (mcapChartInstance) mcapChartInstance.destroy();
+      const valueKey = currentCurrency === 'USD' ? 'marketcap' : 'supply';
+      const fmtVal   = currentCurrency === 'USD' ? fmtUSD : fmtEUR;
+      const fmtAxis  = currentCurrency === 'USD' ? fmtAxisUSD : fmtAxisEUR;
+
+      if (mcapViewMode === 'line') {
+        mcapChartInstance = buildLineChart('chart-mcap', buildStacked(mcapSeriesData, valueKey), fmtVal, fmtAxis);
+      } else {
+        mcapChartInstance = buildDoughnutChart('chart-mcap', mcapSeriesData, valueKey, fmtVal);
+      }
+    }
+
+    function rebuildHolders() {
+      if (holdersChartInstance) holdersChartInstance.destroy();
+      const fmtVal  = v => fmtSpaced(v) + ' holders';
+      const fmtAxis = v => fmtSpaced(v);
+
+      if (holdersViewMode === 'line') {
+        holdersChartInstance = buildLineChart('chart-holders', buildStacked(holdersSeriesData, 'holders'), fmtVal, fmtAxis);
+      } else {
+        holdersChartInstance = buildDoughnutChart('chart-holders', holdersSeriesData, 'holders', fmtVal);
+      }
+    }
 
     function setCurrency(currency) {
-      if (currency === currentCurrency || !mcapSeriesData) return;
+      if (currency === currentCurrency) return;
       currentCurrency = currency;
-
       document.getElementById('btn-usd').classList.toggle('active', currency === 'USD');
       document.getElementById('btn-eur').classList.toggle('active', currency === 'EUR');
       document.getElementById('mcap-title').textContent =
         currency === 'USD' ? 'Market Capitalisation (USD)' : 'Market Capitalisation (EUR)';
-
-      if (mcapChartInstance) mcapChartInstance.destroy();
-      const valueKey = currency === 'USD' ? 'marketcap' : 'supply';
-      const fmtVal  = currency === 'USD' ? fmtUSD : fmtEUR;
-      const fmtAxis = currency === 'USD' ? fmtAxisUSD : fmtAxisEUR;
-      mcapChartInstance = buildChart('chart-mcap', buildStacked(mcapSeriesData, valueKey), fmtVal, fmtAxis);
+      rebuildMcap();
     }
 
-    // Init
+    function setMcapView(mode) {
+      if (mode === mcapViewMode) return;
+      mcapViewMode = mode;
+      document.getElementById('mcap-btn-line').classList.toggle('active', mode === 'line');
+      document.getElementById('mcap-btn-pie').classList.toggle('active',  mode === 'pie');
+      rebuildMcap();
+    }
+
+    function setHoldersView(mode) {
+      if (mode === holdersViewMode) return;
+      holdersViewMode = mode;
+      document.getElementById('holders-btn-line').classList.toggle('active', mode === 'line');
+      document.getElementById('holders-btn-pie').classList.toggle('active',  mode === 'pie');
+      rebuildHolders();
+    }
+
+    // ── Init ────────────────────────────────────────────────────────────────────
     async function init() {
       const files = CHAINS.flatMap(c => [c.mcapFile, c.holdersFile]);
       const results = await Promise.all(
         files.map(f => fetch(f).then(r => r.ok ? r.json() : []).catch(() => []))
       );
 
-      mcapSeriesData   = CHAINS.map((_, i) => results[i * 2]);
-      const holdersSeries = CHAINS.map((_, i) => results[i * 2 + 1]);
+      mcapSeriesData    = CHAINS.map((_, i) => results[i * 2]);
+      holdersSeriesData = CHAINS.map((_, i) => results[i * 2 + 1]);
 
-      mcapChartInstance = buildChart('chart-mcap',
-        buildStacked(mcapSeriesData, 'marketcap'),
-        fmtUSD, fmtAxisUSD
-      );
-
-      buildChart('chart-holders',
-        buildStacked(holdersSeries, 'holders'),
-        v => fmtSpaced(v) + ' holders',
-        v => fmtSpaced(v)
-      );
+      rebuildMcap();
+      rebuildHolders();
 
       document.getElementById('last-updated').textContent =
         'Dernière mise à jour : ' + new Date().toLocaleString('fr-FR', { timeZone: 'UTC' }) + ' UTC';
