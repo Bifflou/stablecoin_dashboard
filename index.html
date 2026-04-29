@@ -364,7 +364,11 @@
       const active  = CHAINS.map((chain, i) => ({ chain, value: values[i] })).filter(d => d.value > 0);
       const baseBg  = active.map(d => d.chain.color + 'CC');
 
-      // Custom plugin: labels with pointer lines drawn on canvas
+      // Custom plugin: labels with pointer lines + collision avoidance
+      const LABEL_H = 27;  // min vertical gap between label centres (px)
+      const R_EXT   = 20;  // radial extension from pie edge
+      const ELBOW   = 14;  // horizontal elbow length
+
       const outerLabelsPlugin = {
         id: 'outerLabels_' + canvasId,
         afterDraw(chart) {
@@ -373,30 +377,56 @@
           if (!meta.data.length) return;
           c.save();
 
+          // 1. Compute natural positions for every active label
+          const items = [];
           meta.data.forEach((arc, i) => {
             const value = data.datasets[0].data[i];
             if (!value) return;
-
-            const label = data.labels[i];
-            const color = active[i].chain.color;
-            const mid   = (arc.startAngle + arc.endAngle) / 2;
-            const cx    = arc.x;
-            const cy    = arc.y;
-            const r     = arc.outerRadius;
+            const mid = (arc.startAngle + arc.endAngle) / 2;
+            const cx = arc.x, cy = arc.y, r = arc.outerRadius;
             const isRight = Math.cos(mid) >= 0;
+            const x2 = cx + (r + R_EXT) * Math.cos(mid);
+            const y2 = cy + (r + R_EXT) * Math.sin(mid);
+            items.push({
+              i, value,
+              label:   data.labels[i],
+              color:   active[i].chain.color,
+              isRight,
+              x1: cx + (r + 5) * Math.cos(mid), // dot on pie
+              y1: cy + (r + 5) * Math.sin(mid),
+              x2, y2nat: y2,                     // radial end (natural y)
+              elbowX: x2 + (isRight ? ELBOW : -ELBOW),
+              adjY: y2,                           // adjusted y (mutable)
+            });
+          });
 
-            // Pointer: radial segment → short elbow
-            const x1 = cx + (r + 5)  * Math.cos(mid);
-            const y1 = cy + (r + 5)  * Math.sin(mid);
-            const x2 = cx + (r + 22) * Math.cos(mid);
-            const y2 = cy + (r + 22) * Math.sin(mid);
-            const x3 = x2 + (isRight ? 14 : -14);
-            const y3 = y2;
+          // 2. Collision avoidance per side — iterative push-apart
+          ['right', 'left'].forEach(side => {
+            const grp = items
+              .filter(d => d.isRight === (side === 'right'))
+              .sort((a, b) => a.adjY - b.adjY);
+            let changed = true, iter = 0;
+            while (changed && iter++ < 60) {
+              changed = false;
+              for (let k = 1; k < grp.length; k++) {
+                const gap = grp[k].adjY - grp[k - 1].adjY;
+                if (gap < LABEL_H) {
+                  const push = (LABEL_H - gap) / 2;
+                  grp[k - 1].adjY -= push;
+                  grp[k].adjY     += push;
+                  changed = true;
+                }
+              }
+            }
+          });
 
+          // 3. Draw lines and text
+          items.forEach(({ x1, y1, x2, y2nat, elbowX, adjY, isRight, label, value, color }) => {
+            // Pointer: pie-edge → radial point → adjusted label position
             c.beginPath();
             c.moveTo(x1, y1);
-            c.lineTo(x2, y2);
-            c.lineTo(x3, y3);
+            c.lineTo(x2, y2nat);
+            c.lineTo(elbowX, adjY);
             c.strokeStyle = color;
             c.lineWidth = 1;
             c.stroke();
@@ -408,17 +438,17 @@
             c.fill();
 
             // Labels: chain name + formatted value
-            const tx = x3 + (isRight ? 6 : -6);
+            const tx = elbowX + (isRight ? 6 : -6);
             c.textAlign    = isRight ? 'left' : 'right';
             c.textBaseline = 'alphabetic';
 
             c.fillStyle = '#c9d1d9';
             c.font = '600 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-            c.fillText(label, tx, y3 - 5);
+            c.fillText(label, tx, adjY - 5);
 
             c.fillStyle = '#8b949e';
             c.font = '11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-            c.fillText(fmtVal(value), tx, y3 + 9);
+            c.fillText(fmtVal(value), tx, adjY + 9);
           });
 
           c.restore();
