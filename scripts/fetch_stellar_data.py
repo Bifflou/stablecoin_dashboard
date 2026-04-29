@@ -184,23 +184,22 @@ def main():
     print(f"  Circulating supply : {current_supply:,.7f} EURCV")
     print(f"  Holders actifs     : {current_holders}")
 
-    print("Récupération des opérations issuer Stellar (Horizon)...")
+    print("Récupération des opérations issuer Stellar (Horizon, pour holders)...")
     ops = get_all_issuer_operations()
     print(f"Total: {len(ops)} opérations")
 
-    print("Reconstruction historique supply + holders...")
-    supply_history, holders_history = process_operations(ops)
-    print(f"  {len(supply_history)} jours avec activité supply")
+    # Supply history: operation replay on Stellar is unreliable (the 15 M EURCV
+    # were not issued via simple payments visible on the issuer account).
+    # We output today's authoritative value only — no false historical zeros.
+    _, holders_history = process_operations(ops)
     print(f"  {len(holders_history)} jours avec activité holders")
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Override last point with authoritative current values
-    if supply_history and supply_history[-1]["date"] == today:
-        supply_history[-1]["supply"] = current_supply
-    else:
-        supply_history.append({"date": today, "supply": current_supply})
+    # Supply: single authoritative point (today)
+    supply_history = [{"date": today, "supply": current_supply}]
 
+    # Holders: append/override today with authoritative count
     if holders_history and holders_history[-1]["date"] == today:
         holders_history[-1]["holders"] = current_holders
     else:
@@ -210,9 +209,20 @@ def main():
         print("Aucune opération EURCV trouvée.")
         return
 
+    from datetime import timedelta
     start_date = supply_history[0]["date"]
-    print(f"Récupération taux EUR/USD depuis le {start_date}...")
-    eur_usd_rates = fetch_eur_usd_rates(start_date)
+    # Fetch rates starting 7 days before to always have a rate to fall back on
+    rates_start = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+    print(f"Récupération taux EUR/USD depuis le {rates_start}...")
+    eur_usd_rates = fetch_eur_usd_rates(rates_start)
+
+    # Pre-seed last_rate with the most recent available rate so forward-fill
+    # works even when supply_history contains only today (rate may lag by a day)
+    if eur_usd_rates:
+        seed_rate = eur_usd_rates[max(eur_usd_rates.keys())]
+        for item in supply_history:
+            if item["date"] not in eur_usd_rates:
+                eur_usd_rates[item["date"]] = seed_rate
 
     marketcap_history = compute_marketcap(supply_history, eur_usd_rates)
 
