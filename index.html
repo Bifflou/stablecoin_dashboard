@@ -348,6 +348,10 @@
     <h1>CoinVertible Dashboard</h1>
     <span class="header-badge">SG Forge</span>
     <p>Données on-chain · EURCV &amp; USDCV · Société Générale</p>
+    <div class="toggle-wrap" style="margin-left:auto; flex-shrink:0;">
+      <button class="toggle-btn active" id="btn-usd" onclick="setCurrency('USD')">USD</button>
+      <button class="toggle-btn"        id="btn-eur" onclick="setCurrency('EUR')">EUR</button>
+    </div>
   </header>
 
   <div class="main-content">
@@ -367,7 +371,7 @@
 
       <div class="card">
         <div class="card-header">
-          <h2>Total Market Cap par Token (USD)</h2>
+          <h2 id="global-mcap-token-title">Total Market Cap par Token (USD)</h2>
           <div class="toggle-wrap">
             <button class="toggle-btn active" id="global-mcap-token-btn-line" onclick="setGlobalView('mcap-token','line')" title="Courbe">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -382,7 +386,7 @@
 
       <div class="card">
         <div class="card-header">
-          <h2>Total Market Cap par Chaîne (USD)</h2>
+          <h2 id="global-mcap-chain-title">Total Market Cap par Chaîne (USD)</h2>
           <div class="toggle-wrap">
             <button class="toggle-btn active" id="global-mcap-chain-btn-line" onclick="setGlobalView('mcap-chain','line')" title="Courbe">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -436,11 +440,6 @@
       <div class="token-col-header">
         <h2>EUR CoinVertible</h2>
         <span class="token-tag">EURCV</span>
-        <!-- shared currency toggle -->
-        <div class="toggle-wrap" style="margin-left:auto;">
-          <button class="toggle-btn active" id="btn-usd" onclick="setCurrency('USD')">USD</button>
-          <button class="toggle-btn"        id="btn-eur" onclick="setCurrency('EUR')">EUR</button>
-        </div>
       </div>
 
       <div class="card">
@@ -867,15 +866,15 @@
       return 0;
     }
 
-    function fmtKpiMcap(v) {
-      if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
-      if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-      if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
-      return '$ ' + fmtSpaced(Math.round(v));
+    function fmtKpiMcap(v, sym = '$') {
+      if (v >= 1e9) return sym + (v / 1e9).toFixed(2) + 'B';
+      if (v >= 1e6) return sym + (v / 1e6).toFixed(2) + 'M';
+      if (v >= 1e3) return sym + (v / 1e3).toFixed(1) + 'K';
+      return sym + ' ' + fmtSpaced(Math.round(v));
     }
 
-    function fmtDetailMcap(v) {
-      return '$ ' + fmtSpaced(Math.round(v));
+    function fmtDetailMcap(v, sym = '$') {
+      return sym + ' ' + fmtSpaced(Math.round(v));
     }
 
     function pct(part, total) {
@@ -895,20 +894,18 @@
         { label: 'USDCV', color: '#9B6DC5' },
       ];
 
+      // ── Currency-aware keys & formatters ──────────────────────────────────
+      const isUSD      = currentCurrency === 'USD';
+      const eurcvMcKey = isUSD ? 'marketcap' : 'supply';
+      const usdcvMcKey = isUSD ? 'supply'    : 'supply_eur';
+      const mcapSym    = isUSD ? '$' : '€';
+
       // ── Latest market cap per chain & token ────────────────────────────────
-      const eurcvMcapLatest = state.eurcv.mcapData.map(s => getLatestValue(s, 'marketcap'));
-      const usdcvMcapLatest = state.usdcv.mcapData.map(s => getLatestValue(s, 'supply'));
+      const eurcvMcapLatest = state.eurcv.mcapData.map(s => getLatestValue(s, eurcvMcKey));
+      const usdcvMcapLatest = state.usdcv.mcapData.map(s => getLatestValue(s, usdcvMcKey));
       const eurcvTotal = eurcvMcapLatest.reduce((a, b) => a + b, 0);
       const usdcvTotal = usdcvMcapLatest.reduce((a, b) => a + b, 0);
       const grandMcap  = eurcvTotal + usdcvTotal;
-
-      // 24h variation: penultimate point from fully merged series
-      const allMcapMerged = mergeSeries([
-        ...state.eurcv.mcapData.map(s => ({ series: s, key: 'marketcap' })),
-        ...state.usdcv.mcapData.map(s => ({ series: s, key: 'supply' })),
-      ]);
-      const prevMcap   = allMcapMerged.length >= 2 ? allMcapMerged[allMcapMerged.length - 2].value : null;
-      const variation  = prevMcap != null ? grandMcap - prevMcap : null;
 
       // ── Per-chain market cap ───────────────────────────────────────────────
       const chainMcaps = ALL_CHAINS.map((ch, i) => ({
@@ -930,23 +927,16 @@
       })).sort((a, b) => b.value - a.value);
 
       // ── Render Card 1 — Total Market Cap ──────────────────────────────────
-      const varHtml = variation != null ? (() => {
-        const sign = variation >= 0 ? '+' : '';
-        const cls  = variation >= 0 ? 'pos' : 'neg';
-        const varPct = prevMcap > 0 ? (variation / prevMcap * 100).toFixed(2) : '0.00';
-        return `<div class="kpi-variation ${cls}">${sign}${fmtKpiMcap(Math.abs(variation)).replace('$','$')} (${sign}${varPct}%)</div>`;
-      })() : '';
-
       document.getElementById('kpi-total-mcap').innerHTML = `
-        <div class="kpi-label">Total Market Cap</div>
-        <div class="kpi-main">${fmtKpiMcap(grandMcap)}</div>
+        <div class="kpi-label">Total Market Cap (${currentCurrency})</div>
+        <div class="kpi-main">${fmtKpiMcap(grandMcap, mcapSym)}</div>
         <div class="kpi-details">
           ${TOKEN_META.map((t, i) => {
             const val = i === 0 ? eurcvTotal : usdcvTotal;
             return `<div class="kpi-row">
               <div class="kpi-dot" style="background:${t.color}"></div>
               <span class="kpi-row-name">${t.label}</span>
-              <span class="kpi-row-val">${fmtDetailMcap(val)}</span>
+              <span class="kpi-row-val">${fmtDetailMcap(val, mcapSym)}</span>
               <span class="kpi-row-pct">(${pct(val, grandMcap)})</span>
             </div>`;
           }).join('')}
@@ -955,9 +945,9 @@
       // ── Render Card 2 — Market Cap by Chain ───────────────────────────────
       const [topChainMcap, ...otherChainsMcap] = chainMcaps.filter(c => c.value > 0);
       document.getElementById('kpi-chain-mcap').innerHTML = `
-        <div class="kpi-label">Market Cap par Chaîne</div>
+        <div class="kpi-label">Market Cap par Chaîne (${currentCurrency})</div>
         ${topChainMcap ? `
-          <div class="kpi-main">${fmtKpiMcap(topChainMcap.value)}</div>
+          <div class="kpi-main">${fmtKpiMcap(topChainMcap.value, mcapSym)}</div>
           <div class="kpi-main-sub"><span style="color:${topChainMcap.color}">${topChainMcap.label}</span> <span class="kpi-row-pct">(${pct(topChainMcap.value, grandMcap)})</span></div>
         ` : '<div class="kpi-main">—</div>'}
         <div class="kpi-details">
@@ -965,7 +955,7 @@
             <div class="kpi-row">
               <div class="kpi-dot" style="background:${c.color}"></div>
               <span class="kpi-row-name">${c.label}</span>
-              <span class="kpi-row-val">${fmtDetailMcap(c.value)}</span>
+              <span class="kpi-row-val">${fmtDetailMcap(c.value, mcapSym)}</span>
               <span class="kpi-row-pct">(${pct(c.value, grandMcap)})</span>
             </div>`).join('')}
         </div>`;
@@ -1072,21 +1062,37 @@
     }
 
     function buildGlobalCharts() {
-      // ── Market Cap by Token (USD) ───────────────────────────────────────────
-      const eurcvMcapTotal = mergeSeries(state.eurcv.mcapData.map(s => ({ series: s, key: 'marketcap' })));
-      const usdcvMcapTotal = mergeSeries(state.usdcv.mcapData.map(s => ({ series: s, key: 'supply' })));
+      const isUSD      = currentCurrency === 'USD';
+      const eurcvMcKey = isUSD ? 'marketcap' : 'supply';
+      const usdcvMcKey = isUSD ? 'supply'    : 'supply_eur';
+      const fmtMcVal   = isUSD ? fmtUSD   : fmtEUR;
+      const fmtMcAxis  = isUSD ? fmtAxisUSD : fmtAxisEUR;
+      const mcapLabel  = isUSD ? 'USD' : 'EUR';
+
+      document.getElementById('global-mcap-token-title').textContent = `Total Market Cap par Token (${mcapLabel})`;
+      document.getElementById('global-mcap-chain-title').textContent = `Total Market Cap par Chaîne (${mcapLabel})`;
+
+      // ── Market Cap by Token ─────────────────────────────────────────────────
+      const eurcvMcapTotal = mergeSeries(state.eurcv.mcapData.map(s => ({ series: s, key: eurcvMcKey })));
+      const usdcvMcapTotal = mergeSeries(state.usdcv.mcapData.map(s => ({ series: s, key: usdcvMcKey })));
       globalData['mcap-token'].chains    = GLOBAL_TOKEN_CHAINS;
       globalData['mcap-token'].seriesArr = [eurcvMcapTotal, usdcvMcapTotal];
+      globalData['mcap-token'].fmtVal    = fmtMcVal;
+      globalData['mcap-token'].fmtAxis   = fmtMcAxis;
+      globalData['mcap-token'].useRates  = false;
       rebuildGlobalChart('mcap-token');
 
-      // ── Market Cap by Chain (USD) ───────────────────────────────────────────
+      // ── Market Cap by Chain ─────────────────────────────────────────────────
       globalData['mcap-chain'].chains    = GLOBAL_CHAIN_CHAINS;
       globalData['mcap-chain'].seriesArr = [
-        mergeSeries([{ series: state.eurcv.mcapData[0], key: 'marketcap' }, { series: state.usdcv.mcapData[0], key: 'supply' }]),
-        mergeSeries([{ series: state.eurcv.mcapData[1], key: 'marketcap' }, { series: state.usdcv.mcapData[1], key: 'supply' }]),
-        mergeSeries([{ series: state.eurcv.mcapData[2], key: 'marketcap' }]),
-        mergeSeries([{ series: state.eurcv.mcapData[3], key: 'marketcap' }]),
+        mergeSeries([{ series: state.eurcv.mcapData[0], key: eurcvMcKey }, { series: state.usdcv.mcapData[0], key: usdcvMcKey }]),
+        mergeSeries([{ series: state.eurcv.mcapData[1], key: eurcvMcKey }, { series: state.usdcv.mcapData[1], key: usdcvMcKey }]),
+        mergeSeries([{ series: state.eurcv.mcapData[2], key: eurcvMcKey }]),
+        mergeSeries([{ series: state.eurcv.mcapData[3], key: eurcvMcKey }]),
       ];
+      globalData['mcap-chain'].fmtVal   = fmtMcVal;
+      globalData['mcap-chain'].fmtAxis  = fmtMcAxis;
+      globalData['mcap-chain'].useRates = false;
       rebuildGlobalChart('mcap-chain');
 
       // ── Holders by Token ────────────────────────────────────────────────────
@@ -1158,6 +1164,8 @@
       currentCurrency = currency;
       document.getElementById('btn-usd').classList.toggle('active', currency === 'USD');
       document.getElementById('btn-eur').classList.toggle('active', currency === 'EUR');
+      buildKpiCards();
+      buildGlobalCharts();
       rebuildChart('eurcv', 'mcap');
       rebuildChart('usdcv', 'mcap');
     }
