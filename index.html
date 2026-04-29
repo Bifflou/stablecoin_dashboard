@@ -364,7 +364,7 @@
       const active  = CHAINS.map((chain, i) => ({ chain, value: values[i] })).filter(d => d.value > 0);
       const baseBg  = active.map(d => d.chain.color + 'CC');
 
-      // Custom plugin: rwa.xyz-style labels with pointer lines
+      // Custom plugin: labels with fixed-column endpoints + symmetric spread
       const outerLabelsPlugin = {
         id: 'outerLabels_' + canvasId,
         afterDraw(chart) {
@@ -373,9 +373,12 @@
           if (!meta.data.length) return;
           c.save();
 
-          const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          const FONT    = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          const MIN_GAP = 28;  // min vertical space between label centres
+          const TICK    = 12;  // short horizontal tick at label column
 
-          // 1. Compute natural label positions (proportional to radius)
+          // 1. Natural positions — each label anchors at its mid-angle Y,
+          //    but the endpoint X is fixed per side (left column / right column)
           const items = [];
           meta.data.forEach((arc, i) => {
             const value = data.datasets[0].data[i];
@@ -383,50 +386,51 @@
             const mid     = (arc.startAngle + arc.endAngle) / 2;
             const cx      = arc.x, cy = arc.y, r = arc.outerRadius;
             const isRight = Math.cos(mid) >= 0;
-            // Start on pie edge (r × 1.05), bend at r × 1.25, then horizontal elbow
-            const x1      = cx + r * 1.05 * Math.cos(mid);
-            const y1      = cy + r * 1.05 * Math.sin(mid);
-            const xMid    = cx + r * 1.25 * Math.cos(mid);
-            const yMid    = cy + r * 1.25 * Math.sin(mid);
-            const xEnd    = xMid + (isRight ? 26 : -26);
-            items.push({ i, value, label: data.labels[i], color: active[i].chain.color,
-                         isRight, x1, y1, xMid, yMid, xEnd, adjY: yMid });
+            items.push({
+              value, label: data.labels[i], color: active[i].chain.color, isRight,
+              x1:   cx + r * 1.02 * Math.cos(mid),          // dot on pie edge
+              y1:   cy + r * 1.02 * Math.sin(mid),
+              xCol: isRight ? cx + r * 1.38 : cx - r * 1.38, // fixed column X
+              xTick: isRight ? cx + r * 1.38 + TICK : cx - r * 1.38 - TICK,
+              adjY: cy + r * 1.38 * Math.sin(mid),           // natural Y
+            });
           });
 
-          // 2. Anti-collision: sort all by Y, push down if gap < 18px
-          items.sort((a, b) => a.adjY - b.adjY);
-          for (let k = 1; k < items.length; k++) {
-            if (items[k].adjY - items[k - 1].adjY < 18)
-              items[k].adjY = items[k - 1].adjY + 18;
-          }
+          // 2. Spread labels per side — symmetric around centre of mass
+          ['right', 'left'].forEach(side => {
+            const grp = items
+              .filter(d => d.isRight === (side === 'right'))
+              .sort((a, b) => a.adjY - b.adjY);
+            if (grp.length < 2) return;
+            const centerY = grp.reduce((s, d) => s + d.adjY, 0) / grp.length;
+            const totalH  = (grp.length - 1) * MIN_GAP;
+            grp.forEach((d, k) => { d.adjY = centerY - totalH / 2 + k * MIN_GAP; });
+          });
 
-          // 3. Draw pointer lines and labels
-          items.forEach(({ x1, y1, xMid, yMid, xEnd, adjY, isRight, label, value, color }) => {
-            // Thin line: pie edge → radial bend → horizontal elbow (at adjusted Y)
+          // 3. Draw: angled line from pie edge → column → tick → text
+          items.forEach(({ x1, y1, xCol, xTick, adjY, isRight, label, value, color }) => {
             c.beginPath();
-            c.moveTo(x1, y1);
-            c.lineTo(xMid, yMid);
-            c.lineTo(xEnd, adjY);
+            c.moveTo(x1, y1);       // pie edge
+            c.lineTo(xCol, adjY);   // angled line to label column
+            c.lineTo(xTick, adjY);  // short horizontal tick
             c.strokeStyle = color;
             c.lineWidth = 1;
             c.stroke();
 
-            // Small circle at pie edge
+            // Dot at pie edge
             c.beginPath();
             c.arc(x1, y1, 2, 0, Math.PI * 2);
             c.fillStyle = color;
             c.fill();
 
-            // Label text: name (normal) then amount (bold)
-            const tx = xEnd + (isRight ? 5 : -5);
+            // Name (normal) + amount (bold)
+            const tx = xTick + (isRight ? 4 : -4);
             c.textAlign    = isRight ? 'left' : 'right';
             c.textBaseline = 'alphabetic';
-
-            c.font      = `12px ${FONT}`;
+            c.font = `12px ${FONT}`;
             c.fillStyle = '#c9d1d9';
-            c.fillText(label, tx, adjY - 4);
-
-            c.font      = `bold 13px ${FONT}`;
+            c.fillText(label, tx, adjY - 3);
+            c.font = `bold 13px ${FONT}`;
             c.fillStyle = '#e6edf3';
             c.fillText(fmtVal(value), tx, adjY + 12);
           });
