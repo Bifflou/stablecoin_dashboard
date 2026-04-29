@@ -46,8 +46,9 @@ def is_eurcv(amount):
 # Holders = count of those lines.
 
 def get_circulating_supply_and_holders():
+    """Returns (circulating_supply, set_of_accounts_with_eurcv_trust_lines)."""
     total_supply = 0.0
-    holders = 0
+    trust_line_accounts = set()
     marker = None
     page = 1
 
@@ -58,25 +59,22 @@ def get_circulating_supply_and_holders():
 
         result = xrpl_post("account_lines", params)
         for line in result.get("lines", []):
-            currency = line.get("currency", "")
-            balance = float(line.get("balance", 0))
-            print(f"  line: account={line.get('account')} currency={currency!r} balance={balance}")
-            if currency.upper() != CURRENCY_HEX.upper():
+            if line.get("currency", "").upper() != CURRENCY_HEX.upper():
                 continue
+            balance = float(line.get("balance", 0))
+            trust_line_accounts.add(line["account"])
             if balance < 0:
                 total_supply += abs(balance)
-            if balance != 0:
-                holders += 1
 
         marker = result.get("marker")
         if not marker:
             break
 
-        print(f"  account_lines page {page}: {holders} holders so far")
+        print(f"  account_lines page {page}: {len(trust_line_accounts)} trust lines so far")
         page += 1
         time.sleep(0.15)
 
-    return round(total_supply, 6), holders
+    return round(total_supply, 6), trust_line_accounts
 
 
 # ── Fetch all issuer transactions ─────────────────────────────────────────────
@@ -169,7 +167,7 @@ def process_transactions(txs):
         count += events_by_date[date]
         holders_history.append({"date": date, "holders": count})
 
-    return supply_history, holders_history
+    return supply_history, holders_history, set(holder_first_seen.keys())
 
 
 # ── EUR/USD + market cap ──────────────────────────────────────────────────────
@@ -201,10 +199,10 @@ def main():
 
     # 1. Authoritative current state via account_lines
     print("Récupération de la circulating supply via account_lines...")
-    current_supply, current_holders = get_circulating_supply_and_holders()
+    current_supply, trust_line_accounts = get_circulating_supply_and_holders()
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     print(f"  Circulating supply actuelle : {current_supply:,.2f} EURCV")
-    print(f"  Holders actifs              : {current_holders}")
+    print(f"  Trust lines EURCV trouvées  : {len(trust_line_accounts)}")
 
     # 2. Historical shape via transaction replay
     print("Récupération des transactions de l'issuer XRPL...")
@@ -212,11 +210,15 @@ def main():
     print(f"Total: {len(txs)} transactions")
 
     print("Reconstruction historique supply + holders...")
-    supply_history, holders_history = process_transactions(txs)
+    supply_history, holders_history, ever_received = process_transactions(txs)
     print(f"  {len(supply_history)} jours avec activité supply (replay)")
     print(f"  {len(holders_history)} jours avec activité holders (replay)")
 
     # 3. Override/append today with account_lines values (authoritative endpoint)
+    # Holders = comptes qui ont réellement reçu des EURCV ET ont encore une trust line active
+    current_holders = len(trust_line_accounts & ever_received)
+    print(f"  Holders actifs (trust line ∩ ever received) : {current_holders}")
+
     if supply_history and supply_history[-1]["date"] == today:
         supply_history[-1]["supply"] = current_supply
     else:
