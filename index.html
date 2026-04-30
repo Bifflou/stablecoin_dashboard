@@ -191,43 +191,161 @@
     .kpi-row-pct  { color: var(--text-sec); font-size: 0.68rem; white-space: nowrap; }
     .kpi-note-tiny { margin-top: 0.4rem; font-size: 0.65rem; color: var(--text-sec); font-style: italic; }
 
-    /* ── Two-column layout ───────────────────────────────────────────────── */
-    .dashboard-cols {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
+    /* ── Token tracker table ─────────────────────────────────────────────── */
+    .tracker-section { margin-bottom: 2.5rem; }
+
+    .tracker-table {
+      width: 100%;
+      border-collapse: collapse;
     }
 
-    @media (max-width: 900px) { .dashboard-cols { grid-template-columns: 1fr; } }
-
-    .token-col {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
+    .tracker-table thead th {
+      padding: 0.6rem 1.1rem;
+      font-size: 0.63rem;
+      font-weight: 700;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      background: var(--bg-deep);
+      user-select: none;
     }
 
-    .token-col-header {
+    .tracker-table thead th.th-right { text-align: right; }
+
+    .tracker-table thead th.th-sortable {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .tracker-table thead th.th-sortable:hover { color: var(--text-sec); }
+    .tracker-table thead th.sort-active { color: var(--text); }
+
+    .sort-icon { margin-left: 4px; font-size: 0.7rem; }
+
+    .tracker-row {
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .tracker-row:hover { background: rgba(255,255,255,0.03); }
+    .tracker-row.is-open { background: rgba(226,0,26,0.04); }
+
+    .tracker-row td {
+      padding: 0.85rem 1.1rem;
+      font-size: 0.85rem;
+      vertical-align: middle;
+    }
+
+    .td-rank { color: var(--text-mute); font-size: 0.75rem; width: 40px; }
+
+    .td-name {
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      min-width: 200px;
+      font-weight: 600;
+      color: var(--text);
     }
 
-    .token-col-header h2 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #FFFFFF;
-      letter-spacing: -0.01em;
+    .token-logo {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--bg-deep);
     }
 
-    .token-col-header .token-tag {
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: var(--red);
-      background: var(--red-dim);
-      border: 1px solid var(--red-dim2);
-      border-radius: 4px;
-      padding: 2px 8px;
-      letter-spacing: 0.08em;
+    .td-ticker {
+      color: var(--text-mute);
+      font-size: 0.78rem;
+      font-weight: 500;
+      font-family: 'Inter', monospace;
+      width: 80px;
+    }
+
+    .td-chains { width: 140px; }
+
+    .chain-logos {
+      display: flex;
+      align-items: center;
+    }
+
+    .chain-logo {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-card);
+      background: var(--bg-deep);
+    }
+    .chain-logo + .chain-logo { margin-left: -6px; }
+
+    .td-mcap {
+      width: 130px;
+      text-align: right;
+      font-weight: 600;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .td-holders {
+      width: 110px;
+      text-align: right;
+      font-weight: 500;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .holders-star {
+      color: var(--text-mute);
+      font-size: 0.7rem;
+      vertical-align: super;
+      margin-left: 1px;
+      cursor: help;
+    }
+
+    .td-arrow {
+      width: 44px;
+      text-align: center;
+      color: var(--text-mute);
+    }
+
+    .row-arrow {
+      display: inline-block;
+      font-size: 1.2rem;
+      transition: transform 0.25s ease;
+      line-height: 1;
+    }
+    .row-arrow.open { transform: rotate(90deg); color: var(--red); }
+
+    /* ── Accordion expand row ─────────────────────────────────────────────── */
+    .tracker-expand-row td { padding: 0; border: none; }
+
+    .expand-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease-in-out;
+    }
+
+    .expand-inner {
+      padding: 1.5rem 1.5rem 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      background: var(--bg-deep);
+      border-bottom: 1px solid var(--border);
+    }
+
+    @media (max-width: 900px) { .expand-inner { grid-template-columns: 1fr; } }
+
+    .expand-chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+
+    /* ── Responsive hide cols ────────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .col-ticker, .col-chains { display: none; }
     }
 
     /* ── Cards ───────────────────────────────────────────────────────────── */
@@ -432,84 +550,25 @@
     <p class="holders-note">* Les holders peuvent être comptés plusieurs fois si présents sur plusieurs chaînes</p>
   </div>
 
-  <div class="dashboard-cols">
-
-    <!-- ── EURCV ── -->
-    <div class="token-col">
-      <div class="token-col-header">
-        <h2>EUR CoinVertible</h2>
-        <span class="token-tag">EURCV</span>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2 id="eurcv-mcap-title">Market Capitalisation (USD)</h2>
-          <div class="toggle-wrap">
-            <button class="toggle-btn active" id="eurcv-mcap-btn-line" onclick="setView('eurcv','mcap','line')" title="Courbe">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button class="toggle-btn" id="eurcv-mcap-btn-pie" onclick="setView('eurcv','mcap','pie')" title="Camembert">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="chart-wrap"><canvas id="chart-eurcv-mcap"></canvas></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2>Nombre de Holders</h2>
-          <div class="toggle-wrap">
-            <button class="toggle-btn active" id="eurcv-holders-btn-line" onclick="setView('eurcv','holders','line')" title="Courbe">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button class="toggle-btn" id="eurcv-holders-btn-pie" onclick="setView('eurcv','holders','pie')" title="Camembert">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="chart-wrap"><canvas id="chart-eurcv-holders"></canvas></div>
-      </div>
+  <!-- ── Token Tracker ── -->
+  <div class="tracker-section">
+    <p class="section-title">Tokens</p>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <table class="tracker-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th class="th-sortable" data-sort="name">Token <span class="sort-icon" id="si-name">↕</span></th>
+            <th class="col-ticker" style="width:80px">Ticker</th>
+            <th class="col-chains" style="width:140px">Chaînes</th>
+            <th class="th-sortable th-right col-mcap" data-sort="mcap" style="width:130px">Market Cap <span class="sort-icon" id="si-mcap">↓</span></th>
+            <th class="th-sortable th-right col-holders" data-sort="holders" style="width:110px">Holders <span class="sort-icon" id="si-holders">↕</span></th>
+            <th style="width:44px"></th>
+          </tr>
+        </thead>
+        <tbody id="tracker-tbody"></tbody>
+      </table>
     </div>
-
-    <!-- ── USDCV ── -->
-    <div class="token-col">
-      <div class="token-col-header">
-        <h2>USD CoinVertible</h2>
-        <span class="token-tag">USDCV</span>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2 id="usdcv-mcap-title">Market Capitalisation (USD)</h2>
-          <div class="toggle-wrap">
-            <button class="toggle-btn active" id="usdcv-mcap-btn-line" onclick="setView('usdcv','mcap','line')" title="Courbe">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button class="toggle-btn" id="usdcv-mcap-btn-pie" onclick="setView('usdcv','mcap','pie')" title="Camembert">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="chart-wrap"><canvas id="chart-usdcv-mcap"></canvas></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2>Nombre de Holders</h2>
-          <div class="toggle-wrap">
-            <button class="toggle-btn active" id="usdcv-holders-btn-line" onclick="setView('usdcv','holders','line')" title="Courbe">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button class="toggle-btn" id="usdcv-holders-btn-pie" onclick="setView('usdcv','holders','pie')" title="Camembert">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="chart-wrap"><canvas id="chart-usdcv-holders"></canvas></div>
-      </div>
-    </div>
-
   </div>
 
   <p id="last-updated"></p>
@@ -1143,39 +1202,271 @@
       usdcv: { mcapMode: 'line', holdersMode: 'line', mcapData: null, holdersData: null, mcapChart: null, holdersChart: null },
     };
 
-    // ── Rebuild functions ───────────────────────────────────────────────────────
+    // ── Rebuild chart (accordion) ───────────────────────────────────────────────
     function rebuildChart(token, type) {
       const s = state[token];
       const chains = token === 'eurcv' ? EURCV_CHAINS : USDCV_CHAINS;
       const canvasId = `chart-${token}-${type}`;
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return; // accordion not open
 
       if (type === 'mcap') {
         if (s.mcapChart) { s.mcapChart.destroy(); s.mcapChart = null; }
+        const wrap = canvas.parentElement;
+        wrap.innerHTML = `<canvas id="${canvasId}"></canvas>`;
         const isUSD    = currentCurrency === 'USD';
         const fmtVal   = isUSD ? fmtUSD : fmtEUR;
         const fmtAxis  = isUSD ? fmtAxisUSD : fmtAxisEUR;
-        // EURCV: USD→'marketcap', EUR→'supply' | USDCV: USD→'supply', EUR→'supply_eur'
         const valueKey = token === 'eurcv'
           ? (isUSD ? 'marketcap' : 'supply')
           : (isUSD ? 'supply'    : 'supply_eur');
-
         if (s.mcapMode === 'line') {
           s.mcapChart = buildLineChart(canvasId, buildStacked(chains, s.mcapData, valueKey), fmtVal, fmtAxis, eurusdRates);
         } else {
           s.mcapChart = buildPieChart(canvasId, s.mcapData, chains, valueKey, fmtVal);
         }
-        document.getElementById(`${token}-mcap-title`).textContent =
-          `Market Capitalisation (${currentCurrency})`;
+        const titleEl = document.getElementById(`${token}-mcap-title`);
+        if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
 
       } else {
         if (s.holdersChart) { s.holdersChart.destroy(); s.holdersChart = null; }
+        const wrap = canvas.parentElement;
+        wrap.innerHTML = `<canvas id="${canvasId}"></canvas>`;
         const fmtVal  = v => fmtSpaced(v) + ' holders';
         const fmtAxis = v => fmtSpaced(v);
-
         if (s.holdersMode === 'line') {
           s.holdersChart = buildLineChart(canvasId, buildStacked(chains, s.holdersData, 'holders'), fmtVal, fmtAxis);
         } else {
           s.holdersChart = buildPieChart(canvasId, s.holdersData, chains, 'holders', fmtVal);
+        }
+      }
+    }
+
+    function setView(token, type, mode) {
+      const s = state[token];
+      const key = type === 'mcap' ? 'mcapMode' : 'holdersMode';
+      if (s[key] === mode) return;
+      s[key] = mode;
+      const lineBtn = document.getElementById(`${token}-${type}-btn-line`);
+      const pieBtn  = document.getElementById(`${token}-${type}-btn-pie`);
+      if (lineBtn) lineBtn.classList.toggle('active', mode === 'line');
+      if (pieBtn)  pieBtn.classList.toggle('active',  mode === 'pie');
+      rebuildChart(token, type);
+    }
+
+    // ── Tracker table ───────────────────────────────────────────────────────────
+    let trackerSort = { key: 'mcap', dir: 'desc' };
+    let openToken   = null;
+
+    const TOKEN_DEFS = [
+      {
+        id: 'eurcv', name: 'EUR CoinVertible', ticker: 'EURCV',
+        logo: './img/eurcv.png',
+        chainDefs: EURCV_CHAINS,
+        chainLogos: [
+          { src: './img/ethereum.png', label: 'Ethereum' },
+          { src: './img/solana.png',   label: 'Solana'   },
+          { src: './img/xrp.png',      label: 'XRP Ledger' },
+          { src: './img/stellar.png',  label: 'Stellar'  },
+        ],
+      },
+      {
+        id: 'usdcv', name: 'USD CoinVertible', ticker: 'USDCV',
+        logo: './img/usdcv.png',
+        chainDefs: USDCV_CHAINS,
+        chainLogos: [
+          { src: './img/ethereum.png', label: 'Ethereum' },
+          { src: './img/solana.png',   label: 'Solana'   },
+        ],
+      },
+    ];
+
+    function getTokenRows() {
+      const isUSD      = currentCurrency === 'USD';
+      const eurcvMcKey = isUSD ? 'marketcap' : 'supply';
+      const usdcvMcKey = isUSD ? 'supply'    : 'supply_eur';
+      return TOKEN_DEFS.map(def => {
+        const mcKey = def.id === 'eurcv' ? eurcvMcKey : usdcvMcKey;
+        const mcap    = state[def.id].mcapData.reduce((s, series) => s + getLatestValue(series, mcKey), 0);
+        const holders = state[def.id].holdersData.reduce((s, series) => s + getLatestValue(series, 'holders'), 0);
+        return { ...def, mcap, holders };
+      });
+    }
+
+    function toggleSort(key) {
+      if (trackerSort.key === key) {
+        trackerSort.dir = trackerSort.dir === 'desc' ? 'asc' : 'desc';
+      } else {
+        trackerSort.key = key;
+        trackerSort.dir = key === 'name' ? 'asc' : 'desc';
+      }
+      buildTrackerTable();
+    }
+
+    function updateSortIcons() {
+      const icons = { name: 'si-name', mcap: 'si-mcap', holders: 'si-holders' };
+      const ths = document.querySelectorAll('.tracker-table .th-sortable');
+      ths.forEach(th => th.classList.remove('sort-active'));
+      Object.entries(icons).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.closest('th').classList.toggle('sort-active', trackerSort.key === key);
+        el.textContent = trackerSort.key !== key ? '↕' : (trackerSort.dir === 'desc' ? '↓' : '↑');
+      });
+    }
+
+    const SVG_LINE = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const SVG_PIE  = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>`;
+
+    function makeExpandInner(token) {
+      const id = token.id;
+      const currency = currentCurrency;
+      return `
+        <div class="expand-chart-card">
+          <div class="card-header">
+            <h2 id="${id}-mcap-title">Market Capitalisation (${currency})</h2>
+            <div class="toggle-wrap">
+              <button class="toggle-btn active" id="${id}-mcap-btn-line" onclick="setView('${id}','mcap','line')" title="Courbe">${SVG_LINE}</button>
+              <button class="toggle-btn"        id="${id}-mcap-btn-pie"  onclick="setView('${id}','mcap','pie')"  title="Camembert">${SVG_PIE}</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-${id}-mcap"></canvas></div>
+        </div>
+        <div class="expand-chart-card">
+          <div class="card-header">
+            <h2>Nombre de Holders</h2>
+            <div class="toggle-wrap">
+              <button class="toggle-btn active" id="${id}-holders-btn-line" onclick="setView('${id}','holders','line')" title="Courbe">${SVG_LINE}</button>
+              <button class="toggle-btn"        id="${id}-holders-btn-pie"  onclick="setView('${id}','holders','pie')"  title="Camembert">${SVG_PIE}</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-${id}-holders"></canvas></div>
+        </div>`;
+    }
+
+    function buildTrackerTable() {
+      // Destroy open charts since we're rebuilding DOM
+      if (openToken && state[openToken]) {
+        ['mcap', 'holders'].forEach(type => {
+          const key = type + 'Chart';
+          if (state[openToken][key]) { state[openToken][key].destroy(); state[openToken][key] = null; }
+        });
+      }
+
+      const rows = getTokenRows();
+      rows.sort((a, b) => {
+        let va = a[trackerSort.key], vb = b[trackerSort.key];
+        if (trackerSort.key === 'name') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+        return trackerSort.dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0)
+                                         : (va > vb ? -1 : va < vb ? 1 : 0);
+      });
+
+      const mcapSym = currentCurrency === 'USD' ? '$' : '€';
+      const tbody = document.getElementById('tracker-tbody');
+      tbody.innerHTML = '';
+
+      rows.forEach((token, idx) => {
+        const isOpen = openToken === token.id;
+
+        // ── Main row ──
+        const tr = document.createElement('tr');
+        tr.className = 'tracker-row' + (isOpen ? ' is-open' : '');
+        tr.dataset.token = token.id;
+        const chainLogosHtml = `<div class="chain-logos">${token.chainLogos.map(c =>
+          `<img src="${c.src}" class="chain-logo" title="${c.label}" alt="${c.label}" onerror="this.style.display='none'">`
+        ).join('')}</div>`;
+        tr.innerHTML = `
+          <td class="td-rank">${idx + 1}</td>
+          <td class="td-name">
+            <img src="${token.logo}" class="token-logo" alt="${token.ticker}" onerror="this.style.display='none'">
+            ${token.name}
+          </td>
+          <td class="td-ticker col-ticker">${token.ticker}</td>
+          <td class="td-chains col-chains">${chainLogosHtml}</td>
+          <td class="td-mcap col-mcap">${fmtKpiMcap(token.mcap, mcapSym)}</td>
+          <td class="td-holders col-holders" title="* Comptage non dédupliqué cross-chaîne">${fmtSpaced(token.holders)}<span class="holders-star">*</span></td>
+          <td class="td-arrow"><span class="row-arrow${isOpen ? ' open' : ''}">›</span></td>
+        `;
+        tr.addEventListener('click', () => toggleAccordion(token.id));
+        tbody.appendChild(tr);
+
+        // ── Accordion row ──
+        const trExp = document.createElement('tr');
+        trExp.className = 'tracker-expand-row';
+        trExp.dataset.token = token.id;
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        const expandBody = document.createElement('div');
+        expandBody.className = 'expand-body';
+        expandBody.id = 'expand-' + token.id;
+        expandBody.style.maxHeight = isOpen ? '900px' : '0';
+        const expandInner = document.createElement('div');
+        expandInner.className = 'expand-inner';
+        expandInner.innerHTML = makeExpandInner(token);
+        expandBody.appendChild(expandInner);
+        td.appendChild(expandBody);
+        trExp.appendChild(td);
+        tbody.appendChild(trExp);
+      });
+
+      updateSortIcons();
+
+      // Wire header sort clicks
+      document.querySelectorAll('.tracker-table .th-sortable').forEach(th => {
+        th.onclick = () => toggleSort(th.dataset.sort);
+      });
+
+      // If accordion was open, rebuild its charts after short delay (DOM settled)
+      if (openToken) {
+        setTimeout(() => {
+          rebuildChart(openToken, 'mcap');
+          rebuildChart(openToken, 'holders');
+        }, 20);
+      }
+    }
+
+    function toggleAccordion(tokenId) {
+      const wasOpen = openToken === tokenId;
+
+      // Close current open
+      if (openToken) {
+        const body = document.getElementById('expand-' + openToken);
+        if (body) body.style.maxHeight = '0';
+        // Destroy charts
+        ['mcap', 'holders'].forEach(type => {
+          const key = type + 'Chart';
+          if (state[openToken][key]) { state[openToken][key].destroy(); state[openToken][key] = null; }
+        });
+        // Update row indicators
+        const prevRow = document.querySelector(`.tracker-row[data-token="${openToken}"]`);
+        if (prevRow) {
+          prevRow.classList.remove('is-open');
+          const arrow = prevRow.querySelector('.row-arrow');
+          if (arrow) arrow.classList.remove('open');
+        }
+        openToken = null;
+      }
+
+      if (!wasOpen) {
+        openToken = tokenId;
+        const body = document.getElementById('expand-' + tokenId);
+        const row  = document.querySelector(`.tracker-row[data-token="${tokenId}"]`);
+        if (row) {
+          row.classList.add('is-open');
+          const arrow = row.querySelector('.row-arrow');
+          if (arrow) arrow.classList.add('open');
+        }
+        if (body) {
+          body.style.maxHeight = '900px';
+          // Rebuild charts after animation completes
+          body.addEventListener('transitionend', function handler(e) {
+            if (e.propertyName !== 'max-height') return;
+            body.removeEventListener('transitionend', handler);
+            if (openToken === tokenId) {
+              rebuildChart(tokenId, 'mcap');
+              rebuildChart(tokenId, 'holders');
+            }
+          });
         }
       }
     }
@@ -1187,18 +1478,7 @@
       document.getElementById('btn-eur').classList.toggle('active', currency === 'EUR');
       buildKpiCards();
       buildGlobalCharts();
-      rebuildChart('eurcv', 'mcap');
-      rebuildChart('usdcv', 'mcap');
-    }
-
-    function setView(token, type, mode) {
-      const s = state[token];
-      const key = type === 'mcap' ? 'mcapMode' : 'holdersMode';
-      if (s[key] === mode) return;
-      s[key] = mode;
-      document.getElementById(`${token}-${type}-btn-line`).classList.toggle('active', mode === 'line');
-      document.getElementById(`${token}-${type}-btn-pie`).classList.toggle('active',  mode === 'pie');
-      rebuildChart(token, type);
+      buildTrackerTable(); // rebuilds table values + refreshes open accordion charts
     }
 
     // ── Init ────────────────────────────────────────────────────────────────────
@@ -1224,10 +1504,7 @@
 
       buildKpiCards();
       buildGlobalCharts();
-      rebuildChart('eurcv', 'mcap');
-      rebuildChart('eurcv', 'holders');
-      rebuildChart('usdcv', 'mcap');
-      rebuildChart('usdcv', 'holders');
+      buildTrackerTable();
 
       document.getElementById('last-updated').textContent =
         'Dernière mise à jour : ' + new Date().toLocaleString('fr-FR', { timeZone: 'UTC' }) + ' UTC';
