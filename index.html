@@ -579,7 +579,7 @@
 
     /* ── External tooltip ────────────────────────────────────────────────── */
     .chart-tooltip {
-      position: absolute;
+      position: fixed;
       background: var(--chart-bg);
       border: 1px solid var(--border-hi);
       border-radius: 8px;
@@ -588,7 +588,7 @@
       opacity: 0;
       transition: opacity 0.1s;
       min-width: 220px;
-      z-index: 10;
+      z-index: 9999;
       font-size: 0.81rem;
       box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
@@ -827,8 +827,7 @@
         if (!el) {
           el = document.createElement('div');
           el.className = 'chart-tooltip';
-          chart.canvas.parentElement.style.position = 'relative';
-          chart.canvas.parentElement.appendChild(el);
+          document.body.appendChild(el);
           chart._ttEl = el;
         }
 
@@ -866,10 +865,14 @@
           ${rateFooter}
         `;
 
+        // Position relative to viewport (fixed) so tooltip escapes table stacking context
+        const rect = chart.canvas.getBoundingClientRect();
         const cx = tooltip.caretX, cy = tooltip.caretY, ttW = 240;
+        const screenX = rect.left + cx;
+        const screenY = rect.top  + cy;
         el.style.opacity = '1';
-        el.style.top  = Math.max(0, cy - 20) + 'px';
-        el.style.left = (cx + ttW + 20 > chart.width ? cx - ttW - 10 : cx + 14) + 'px';
+        el.style.top  = Math.max(0, screenY - 20) + 'px';
+        el.style.left = (screenX + ttW + 20 > window.innerWidth ? screenX - ttW - 10 : screenX + 14) + 'px';
       };
     }
 
