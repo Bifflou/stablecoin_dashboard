@@ -9,17 +9,13 @@ from datetime import datetime, timezone, timedelta
 
 ISSUER        = "GCEYGIVOLAVBF2TG2RUSGTUJCIN75KEX3NGLMY4VPL4GFE5L355AXW3G"
 ADMIN         = "GCYYFR4SR4RDSWTN64LSE4BGF2UQEDYZ32QTD7TMQXO6TXSGEDWP652D"
-CONTRACT      = "CANKBYNNAYKEZXLB655F2UPNTAZFK5HILZUXL7ZTFR3NF6LKDSVY7KFH"
-# Operational wallets excluded from holder count
-EXCLUDED_ADDRS = {ISSUER, ADMIN}
 ASSET_CODE    = "EURCV"
 HORIZON       = "https://horizon.stellar.org"
 EXPERT_BASE   = "https://api.stellar.expert"
 EXPERT        = f"{EXPERT_BASE}/explorer/public/asset/{ASSET_CODE}-{ISSUER}"
-STELLAR_SCALE = 10 ** 7   # Stellar uses 7 decimal places
+STELLAR_SCALE = 10 ** 7
 
 STATE_FILE = "data/stellar_state.json"
-LOOKBACK = 3  # safety margin in days (unused directly — cursor-based is exact)
 
 
 # ── I/O helpers ────────────────────────────────────────────────────────────────
@@ -34,74 +30,33 @@ def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f)
 
-
 def iso_to_date(iso):
     return iso[:10]
 
 
-# ── XDR / ScVal decoding (no external deps) ────────────────────────────────────
+# ── ScVal decoding (supply only — symbol + i128/u128) ──────────────────────────
 
 SCV_I128   = 10
 SCV_U128   = 9
 SCV_SYMBOL = 15
-SCV_ADDRESS = 16
-SC_ADDR_ACCOUNT  = 0
-SC_ADDR_CONTRACT = 1
-
-
-def _crc16_xmodem(data: bytes) -> int:
-    crc = 0
-    for byte in data:
-        crc ^= byte << 8
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) if crc & 0x8000 else (crc << 1)
-        crc &= 0xFFFF
-    return crc
-
-
-def _strkey(version_byte: int, payload: bytes) -> str:
-    """Encode raw bytes to a Stellar StrKey string (base32, no padding)."""
-    data = bytes([version_byte]) + payload
-    crc  = _crc16_xmodem(data)
-    full = data + struct.pack('<H', crc)
-    return base64.b32encode(full).decode('ascii').rstrip('=')
-
 
 def decode_scval(b64):
-    """
-    Decode a base64-encoded Soroban ScVal.
-    Returns (type_str, python_value) or (None, None) on failure.
-    """
     if not b64:
         return None, None
     try:
         raw = base64.b64decode(b64)
-        discriminant = struct.unpack('>I', raw[:4])[0]
-
-        if discriminant == SCV_SYMBOL:
+        disc = struct.unpack('>I', raw[:4])[0]
+        if disc == SCV_SYMBOL:
             length = struct.unpack('>I', raw[4:8])[0]
             return 'symbol', raw[8:8 + length].decode('utf-8')
-
-        elif discriminant == SCV_I128:
-            hi = struct.unpack('>q', raw[4:12])[0]   # signed int64
-            lo = struct.unpack('>Q', raw[12:20])[0]  # unsigned int64
+        elif disc == SCV_I128:
+            hi = struct.unpack('>q', raw[4:12])[0]
+            lo = struct.unpack('>Q', raw[12:20])[0]
             return 'i128', (hi << 64) | lo
-
-        elif discriminant == SCV_U128:
+        elif disc == SCV_U128:
             hi = struct.unpack('>Q', raw[4:12])[0]
             lo = struct.unpack('>Q', raw[12:20])[0]
             return 'u128', (hi << 64) | lo
-
-        elif discriminant == SCV_ADDRESS:
-            addr_type = struct.unpack('>I', raw[4:8])[0]
-            if addr_type == SC_ADDR_ACCOUNT and len(raw) >= 44:
-                # ScVal(4) + SCAddress.type(4) + PublicKey.type(4) + ed25519(32)
-                pubkey = raw[12:44]
-                return 'address', _strkey(6 << 3, pubkey)   # G... account
-            elif addr_type == SC_ADDR_CONTRACT and len(raw) >= 40:
-                # ScVal(4) + SCAddress.type(4) + hash(32)
-                return 'address', _strkey(2 << 3, raw[8:40])  # C... contract
-
     except Exception:
         pass
     return None, None
@@ -115,26 +70,23 @@ def get_asset_info():
     return resp.json()
 
 
-def get_circulating_supply_and_holders():
-    """stellar.expert /holders — returns (supply, holder_addresses list)."""
+def get_current_supply_and_holders():
+    """Authoritative current values from stellar.expert /holders."""
     total_supply = 0.0
-    holder_addresses = []
+    holder_count = 0
     url = f"{EXPERT}/holders"
-
     while True:
         resp = requests.get(url, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         records = data.get("_embedded", {}).get("records", [])
-
         for r in records:
             bal = float(r.get("balance", 0)) / STELLAR_SCALE
-            addr = r.get("account", "")
             if bal > 0:
                 total_supply += bal
-                if addr and addr not in EXCLUDED_ADDRS:
-                    holder_addresses.append(addr)
-
+                addr = r.get("account", "")
+                if addr and addr not in (ISSUER, ADMIN):
+                    holder_count += 1
         next_href = data.get("_links", {}).get("next", {}).get("href")
         if not next_href or not records:
             break
@@ -142,34 +94,20 @@ def get_circulating_supply_and_holders():
             next_href = EXPERT_BASE + next_href
         url = next_href
         time.sleep(0.1)
-
-    return round(total_supply, 7), holder_addresses
-
-
-    return None
+    return round(total_supply, 7), holder_count
 
 
 # ── Historical operations (Horizon) ────────────────────────────────────────────
 
 def get_account_operations_since(account, cursor=None, label="account"):
-    """
-    Paginate operations on an account starting after cursor (exclusive).
-    cursor=None → fetch from the beginning (oldest first).
-    Returns (ops_list, last_op_id).
-    """
     all_ops = []
     last_op_id = cursor
-
+    url = f"{HORIZON}/accounts/{account}/operations"
+    params = {"order": "asc", "limit": 200}
     if cursor:
-        url = f"{HORIZON}/accounts/{account}/operations"
-        params = {"cursor": cursor, "order": "asc", "limit": 200}
-        use_params = True
+        params["cursor"] = cursor
         print(f"  [{label}] Mode incrémental depuis cursor {cursor}")
-    else:
-        url = f"{HORIZON}/accounts/{account}/operations"
-        params = {"order": "asc", "limit": 200}
-        use_params = True
-
+    use_params = True
     page = 1
     while True:
         resp = requests.get(url, params=(params if use_params else None), timeout=30)
@@ -177,12 +115,9 @@ def get_account_operations_since(account, cursor=None, label="account"):
         data = resp.json()
         records = data.get("_embedded", {}).get("records", [])
         all_ops.extend(records)
-
         if records:
             last_op_id = records[-1]["id"]
-
         print(f"  [{label}] Page {page}: {len(records)} ops (total: {len(all_ops)})")
-
         next_href = data.get("_links", {}).get("next", {}).get("href")
         if not next_href or not records:
             break
@@ -190,19 +125,77 @@ def get_account_operations_since(account, cursor=None, label="account"):
         use_params = False
         page += 1
         time.sleep(0.15)
-
     return all_ops, last_op_id
 
 
-# ── Operation processing ────────────────────────────────────────────────────────
+# ── Supply reconstruction ──────────────────────────────────────────────────────
 
-def process_operations(ops):
-    """
-    Reconstruct daily supply delta from issuer/admin operations.
-    Returns (delta_by_date, holder_first_seen).
-    """
+def process_supply(ops):
+    """Extract mint/burn/payment deltas for supply reconstruction."""
     delta_by_date = defaultdict(float)
-    holder_first_seen = {}
+    for op in ops:
+        op_type = op.get("type", "")
+        date = iso_to_date(op.get("created_at", "") or "")
+        if not date:
+            continue
+
+        if op_type == "payment":
+            if op.get("asset_code") != ASSET_CODE or op.get("asset_issuer") != ISSUER:
+                continue
+            amount = float(op.get("amount", 0))
+            src, dst = op.get("from", ""), op.get("to", "")
+            if src == ISSUER:
+                delta_by_date[date] += amount
+            elif dst == ISSUER:
+                delta_by_date[date] -= amount
+
+        elif op_type == "invoke_host_function":
+            if not op.get("function", "").endswith("InvokeContract"):
+                continue
+            params = op.get("parameters", [])
+            if len(params) < 3:
+                continue
+            _, fn_name = decode_scval(params[1].get("value", ""))
+            if fn_name not in ("mint", "mint_to_account", "burn", "clawback"):
+                continue
+            _, raw_amount = decode_scval(params[-1].get("value", ""))
+            if raw_amount is None:
+                print(f"  [warn] could not decode amount for {fn_name} on {date}")
+                continue
+            amount = raw_amount / STELLAR_SCALE
+            print(f"  Soroban {fn_name}: {amount:,.2f} EURCV on {date}")
+            if fn_name in ("mint", "mint_to_account"):
+                delta_by_date[date] += amount
+            else:
+                delta_by_date[date] -= amount
+
+        elif op_type == "clawback":
+            if op.get("asset_code") != ASSET_CODE or op.get("asset_issuer") != ISSUER:
+                continue
+            delta_by_date[date] -= float(op.get("amount", 0))
+
+    return delta_by_date
+
+
+def build_supply_history(delta_by_date, initial_cumulative=0.0):
+    history = []
+    cumulative = initial_cumulative
+    for date in sorted(delta_by_date.keys()):
+        cumulative += delta_by_date[date]
+        history.append({"date": date, "supply": round(max(0.0, cumulative), 2)})
+    return history, cumulative
+
+
+# ── Holders reconstruction (balance tracking) ──────────────────────────────────
+
+def build_holders_snapshot(ops, prev_balances=None):
+    """
+    Track EURCV holder count by maintaining per-account balances.
+    Processes payment (to/from) and change_trust (close = balance → 0) ops.
+    Returns (daily_snapshots, final_balances).
+    """
+    balances = dict(prev_balances) if prev_balances else {}
+    events_by_date = defaultdict(list)
 
     for op in ops:
         op_type = op.get("type", "")
@@ -210,83 +203,38 @@ def process_operations(ops):
         if not date:
             continue
 
-        # ── Classic payment ──────────────────────────────────────────────────
         if op_type == "payment":
             if op.get("asset_code") != ASSET_CODE or op.get("asset_issuer") != ISSUER:
                 continue
             amount = float(op.get("amount", 0))
-            src = op.get("from", "")
-            dst = op.get("to", "")
+            src, dst = op.get("from", ""), op.get("to", "")
+            events_by_date[date].append(("payment", src, dst, amount))
 
-            if src == ISSUER:
-                delta_by_date[date] += amount
-                if dst and dst != ISSUER and dst not in holder_first_seen:
-                    holder_first_seen[dst] = date
-            elif dst == ISSUER:
-                delta_by_date[date] -= amount
-
-        # ── Soroban invoke_host_function ─────────────────────────────────────
-        elif op_type == "invoke_host_function":
-            if not op.get("function", "").endswith("InvokeContract"):
-                continue
-
-            params = op.get("parameters", [])
-            if len(params) < 3:
-                continue
-
-            _, fn_name = decode_scval(params[1].get("value", ""))
-            if fn_name not in ("mint", "mint_to_account", "burn", "clawback"):
-                continue
-
-            _, raw_amount = decode_scval(params[-1].get("value", ""))
-            if raw_amount is None:
-                print(f"  [warn] could not decode amount for {fn_name} on {date}")
-                continue
-
-            amount = raw_amount / STELLAR_SCALE
-            print(f"  Soroban {fn_name}: {amount:,.2f} EURCV on {date}")
-
-            if fn_name in ("mint", "mint_to_account"):
-                delta_by_date[date] += amount
-                # Extract recipient: mint(to, amount) → params[2]
-                #                    mint_to_account(from, to, amount) → params[3]
-                recipient_idx = 3 if fn_name == "mint_to_account" else 2
-                if len(params) > recipient_idx:
-                    _, recipient = decode_scval(params[recipient_idx].get("value", ""))
-                    if recipient and recipient not in EXCLUDED_ADDRS and recipient not in holder_first_seen:
-                        holder_first_seen[recipient] = date
-                        print(f"  → nouveau holder {recipient[:12]}… le {date}")
-            else:
-                delta_by_date[date] -= amount
-
-        # ── Clawback (classic) ───────────────────────────────────────────────
-        elif op_type == "clawback":
+        elif op_type == "change_trust":
             if op.get("asset_code") != ASSET_CODE or op.get("asset_issuer") != ISSUER:
                 continue
-            delta_by_date[date] -= float(op.get("amount", 0))
+            trustor = op.get("trustor", "")
+            limit = float(op.get("limit", "0") or 0)
+            events_by_date[date].append(("change_trust", trustor, limit))
 
-    return delta_by_date, holder_first_seen
-
-
-def build_supply_history(delta_by_date, initial_cumulative=0.0):
-    supply_history = []
-    cumulative = initial_cumulative
-    for date in sorted(delta_by_date.keys()):
-        cumulative += delta_by_date[date]
-        supply_history.append({"date": date, "supply": round(max(0.0, cumulative), 2)})
-    return supply_history, cumulative
-
-
-def build_holders_history_from_map(holder_first_seen):
-    events_by_date = defaultdict(int)
-    for date in holder_first_seen.values():
-        events_by_date[date] += 1
-    holders_history = []
-    count = 0
+    snapshots = []
     for date in sorted(events_by_date.keys()):
-        count += events_by_date[date]
-        holders_history.append({"date": date, "holders": count})
-    return holders_history
+        for event in events_by_date[date]:
+            if event[0] == "payment":
+                _, src, dst, amount = event
+                if src and src not in (ISSUER, ADMIN):
+                    balances[src] = balances.get(src, 0.0) - amount
+                if dst and dst not in (ISSUER, ADMIN):
+                    balances[dst] = balances.get(dst, 0.0) + amount
+            elif event[0] == "change_trust":
+                _, trustor, limit = event
+                if limit == 0 and trustor:
+                    balances[trustor] = 0.0
+
+        count = sum(1 for v in balances.values() if v > 0)
+        snapshots.append({"date": date, "holders": count})
+
+    return snapshots, balances
 
 
 # ── EUR/USD + marketcap ────────────────────────────────────────────────────────
@@ -319,7 +267,6 @@ def compute_marketcap(supply_history, eur_usd_rates):
 
 def main():
     os.makedirs("data", exist_ok=True)
-
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     print("Récupération métadonnées asset via stellar.expert...")
@@ -331,36 +278,31 @@ def main():
     )
     print(f"  Asset créé le : {created_date}")
 
-    print("Récupération supply + holders via stellar.expert /holders...")
-    current_supply, holder_addresses = get_circulating_supply_and_holders()
-    current_holders = len(holder_addresses)
+    print("Récupération supply + holders actuels via stellar.expert...")
+    current_supply, current_holders = get_current_supply_and_holders()
     print(f"  Circulating supply : {current_supply:,.2f} EURCV")
-    print(f"  Holders actifs     : {current_holders} — {holder_addresses}")
+    print(f"  Holders actifs     : {current_holders}")
 
     state = load_json(STATE_FILE, default={})
     existing_marketcap = load_json("data/stellar_marketcap.json", default=[])
-    existing_holders = load_json("data/stellar_holders.json", default=[])
+    existing_holders   = load_json("data/stellar_holders.json",   default=[])
 
-    if state and state.get("last_op_id_issuer") and existing_marketcap:
+    if state.get("last_op_id_issuer") and existing_marketcap:
         # ── Incremental mode ───────────────────────────────────────────────────
-        cursor_issuer = state["last_op_id_issuer"]
-        cursor_admin = state.get("last_op_id_admin")
-        saved_holder_first_seen = state.get("holder_first_seen", {})
+        cursor_issuer  = state["last_op_id_issuer"]
+        cursor_admin   = state.get("last_op_id_admin")
         supply_cumulative = float(state.get("supply_cumulative", 0.0))
+        prev_balances  = {k: float(v) for k, v in state.get("balances", {}).items()}
 
-        print(f"Mode incrémental — opérations issuer depuis cursor {cursor_issuer}")
+        print(f"Mode incrémental — issuer depuis {cursor_issuer}")
         ops_issuer, new_cursor_issuer = get_account_operations_since(
             ISSUER, cursor=cursor_issuer, label="issuer"
         )
-        print(f"  Issuer: {len(ops_issuer)} nouvelles opérations")
-
-        print(f"Mode incrémental — opérations admin depuis cursor {cursor_admin}")
+        print(f"Mode incrémental — admin depuis {cursor_admin}")
         ops_admin, new_cursor_admin = get_account_operations_since(
             ADMIN, cursor=cursor_admin, label="admin"
         )
-        print(f"  Admin: {len(ops_admin)} nouvelles opérations")
 
-        # Deduplicate + sort
         seen_ids = set()
         new_ops = []
         for op in ops_issuer + ops_admin:
@@ -369,64 +311,46 @@ def main():
                 seen_ids.add(oid)
                 new_ops.append(op)
         new_ops.sort(key=lambda o: o.get("created_at", ""))
-        print(f"  Total nouvelles opérations (dédupliquées) : {len(new_ops)}")
+        print(f"  {len(new_ops)} nouvelles opérations")
 
-        # Check for unresolved holders before deciding to exit early
-        unresolved = [a for a in holder_addresses if a not in saved_holder_first_seen]
-        if not new_ops and not unresolved:
-            print("Aucune nouvelle opération et aucun nouveau holder — fichiers inchangés.")
+        if not new_ops:
+            print("Aucune nouvelle opération — fichiers inchangés.")
             return
 
-        delta_by_date, new_holder_first_seen = process_operations(new_ops) if new_ops else ({}, {})
-
-        # Merge holder_first_seen (don't overwrite existing first-seen dates)
-        merged_holder_first_seen = dict(saved_holder_first_seen)
-        for addr, date in new_holder_first_seen.items():
-            if addr not in merged_holder_first_seen:
-                merged_holder_first_seen[addr] = date
-
-        # Build incremental supply from cumulative base
+        # Supply
+        delta_by_date = process_supply(new_ops)
         new_supply_history, new_cumulative = build_supply_history(delta_by_date, supply_cumulative)
-        print(f"  {len(new_supply_history)} nouveaux jours avec activité supply")
-
-        if new_supply_history:
-            first_new_date = new_supply_history[0]["date"]
-        else:
-            first_new_date = today
-
-        # Merge: keep existing before first_new_date, append new
-        kept_marketcap = [pt for pt in existing_marketcap if pt["date"] < first_new_date]
+        first_new_supply_date = new_supply_history[0]["date"] if new_supply_history else today
+        kept_marketcap = [pt for pt in existing_marketcap if pt["date"] < first_new_supply_date]
         merged_raw_supply = (
             [{"date": pt["date"], "supply": pt["supply"]} for pt in kept_marketcap]
             + new_supply_history
         )
 
-        # Rebuild holders history from merged cache
-        new_holders_history = build_holders_history_from_map(merged_holder_first_seen)
-        first_new_holder_date = new_holders_history[0]["date"] if new_holders_history else today
-        kept_holders = [pt for pt in existing_holders if pt["date"] < first_new_holder_date]
-        merged_holders = kept_holders + new_holders_history
+        # Holders
+        new_holders_snapshots, new_balances = build_holders_snapshot(new_ops, prev_balances)
+        if new_holders_snapshots:
+            first_new_holder_date = new_holders_snapshots[0]["date"]
+            kept_holders = [pt for pt in existing_holders if pt["date"] < first_new_holder_date]
+            merged_holders = kept_holders + new_holders_snapshots
+        else:
+            merged_holders = existing_holders
+            new_balances = prev_balances
 
         new_state = {
             "last_op_id_issuer": new_cursor_issuer or cursor_issuer,
-            "last_op_id_admin": new_cursor_admin or cursor_admin,
+            "last_op_id_admin":  new_cursor_admin  or cursor_admin,
             "supply_cumulative": new_cumulative,
-            "holder_first_seen": merged_holder_first_seen,
+            "balances": new_balances,
         }
 
     else:
         # ── Full fetch (first run) ─────────────────────────────────────────────
         print("Premier fetch complet...")
 
-        print("Récupération des opérations issuer Stellar (Horizon)...")
         ops_issuer, last_op_id_issuer = get_account_operations_since(ISSUER, label="issuer")
-        print(f"  Issuer: {len(ops_issuer)} opérations")
+        ops_admin,  last_op_id_admin  = get_account_operations_since(ADMIN,  label="admin")
 
-        print("Récupération des opérations admin Stellar (Horizon)...")
-        ops_admin, last_op_id_admin = get_account_operations_since(ADMIN, label="admin")
-        print(f"  Admin: {len(ops_admin)} opérations")
-
-        # Deduplicate + sort
         seen_ids = set()
         ops = []
         for op in ops_issuer + ops_admin:
@@ -435,42 +359,30 @@ def main():
                 seen_ids.add(oid)
                 ops.append(op)
         ops.sort(key=lambda o: o.get("created_at", ""))
-        print(f"Total: {len(ops)} opérations (dédupliquées)")
+        print(f"Total: {len(ops)} opérations")
 
-        delta_by_date, holder_first_seen = process_operations(ops)
+        # Supply
+        delta_by_date = process_supply(ops)
         merged_raw_supply, new_cumulative = build_supply_history(delta_by_date)
-        merged_holders = build_holders_history_from_map(holder_first_seen)
 
-        print(f"  {len(merged_raw_supply)} jours avec activité supply")
-        print(f"  {len(merged_holders)} jours avec activité holders")
-
-        # Fallback: flat line from creation date if no ops found
-        if len(merged_raw_supply) == 0 and created_date and created_date < today:
-            print("  Avertissement: aucune opération trouvée — ligne plate utilisée.")
+        if not merged_raw_supply and created_date and created_date < today:
             merged_raw_supply = [
                 {"date": created_date, "supply": current_supply},
                 {"date": today,        "supply": current_supply},
             ]
 
+        # Holders
+        merged_holders, final_balances = build_holders_snapshot(ops)
+        print(f"  {len(merged_raw_supply)} jours supply, {len(merged_holders)} jours holders")
+
         new_state = {
             "last_op_id_issuer": last_op_id_issuer,
-            "last_op_id_admin": last_op_id_admin,
+            "last_op_id_admin":  last_op_id_admin,
             "supply_cumulative": new_cumulative,
-            "holder_first_seen": holder_first_seen,
+            "balances": final_balances,
         }
 
-    # ── Fallback: current holders not found via ops (e.g. P2P transfers) ─────
-    holder_first_seen_ref = new_state["holder_first_seen"]
-    new_addrs = [a for a in holder_addresses if a not in holder_first_seen_ref]
-    if new_addrs:
-        print(f"  {len(new_addrs)} holder(s) non trouvés dans les ops, daté(s) à today :")
-        for addr in new_addrs:
-            print(f"    {addr}")
-            holder_first_seen_ref[addr] = today
-        merged_holders = build_holders_history_from_map(holder_first_seen_ref)
-        new_state["holder_first_seen"] = holder_first_seen_ref
-
-    # ── Override today with authoritative current_supply from stellar.expert ───
+    # ── Override today with authoritative values from stellar.expert ──────────
     if merged_raw_supply and merged_raw_supply[-1]["date"] == today:
         merged_raw_supply[-1]["supply"] = current_supply
     else:
@@ -493,7 +405,6 @@ def main():
     print(f"Récupération taux EUR/USD depuis le {rates_start}...")
     eur_usd_rates = fetch_eur_usd_rates(rates_start)
 
-    # Pre-seed latest rate for any supply date missing a rate
     if eur_usd_rates:
         seed_rate = eur_usd_rates[max(eur_usd_rates.keys())]
         for item in merged_raw_supply:
@@ -507,9 +418,8 @@ def main():
     save_json("data/stellar_marketcap.json", marketcap_history)
     save_json("data/stellar_holders.json", merged_holders)
 
-    print(f"Sauvegardé : {len(marketcap_history)} points market cap, "
-          f"{len(merged_holders)} points holders")
-    for pt in marketcap_history[-5:]:
+    print(f"Sauvegardé : {len(marketcap_history)} points supply, {len(merged_holders)} points holders")
+    for pt in marketcap_history[-3:]:
         print(f"  {pt['date']} : supply={pt['supply']:,.2f}  mcap=${pt['marketcap']:,.2f}")
 
 
