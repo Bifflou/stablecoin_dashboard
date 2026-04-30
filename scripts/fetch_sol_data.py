@@ -16,7 +16,6 @@ KNOWN_HOLDERS_FILE = "data/sol_known_holders.json"  # cache {address: first_seen
 
 LOOKBACK_DAYS = 3    # safety margin — re-fetch last N days
 MAX_RETRIES = 8
-BATCH_SIZE = 3       # getTransaction per batch (Helius payload limit)
 
 
 # ── I/O helpers ────────────────────────────────────────────────────────────────
@@ -51,27 +50,6 @@ def rpc(method, params):
             raise RuntimeError(f"RPC error: {data['error']}")
         return data.get("result")
     raise RuntimeError(f"Échec après {MAX_RETRIES} tentatives pour {method}")
-
-
-def rpc_batch(requests_list):
-    """Batch JSON-RPC — multiple requests in a single HTTP call."""
-    payload = [
-        {"jsonrpc": "2.0", "id": i, "method": r["method"], "params": r["params"]}
-        for i, r in enumerate(requests_list)
-    ]
-    wait = 2.0
-    for attempt in range(MAX_RETRIES):
-        resp = requests.post(HELIUS_RPC, json=payload, timeout=60)
-        if resp.status_code == 429:
-            print(f"  [429 batch] attente {wait:.0f}s (tentative {attempt + 1}/{MAX_RETRIES})...")
-            time.sleep(wait)
-            wait = min(wait * 2, 60)
-            continue
-        resp.raise_for_status()
-        results = resp.json()
-        results.sort(key=lambda r: r.get("id", 0))
-        return [r.get("result") for r in results]
-    raise RuntimeError(f"Échec batch après {MAX_RETRIES} tentatives")
 
 
 # ── Decimals ───────────────────────────────────────────────────────────────────
@@ -181,28 +159,20 @@ def reconstruct_supply(signatures, decimals, initial_raw=0):
     found = 0
     total = len(signatures)
 
-    for batch_start in range(0, total, BATCH_SIZE):
-        batch = signatures[batch_start:batch_start + BATCH_SIZE]
-        reqs = [
-            {"method": "getTransaction", "params": [s["signature"], {
-                "encoding": "jsonParsed",
-                "maxSupportedTransactionVersion": 0,
-            }]}
-            for s in batch
-        ]
-        results = rpc_batch(reqs)
+    for i, sig_info in enumerate(signatures):
+        parsed = rpc("getTransaction", [sig_info["signature"], {
+            "encoding": "jsonParsed",
+            "maxSupportedTransactionVersion": 0,
+        }])
+        ts = sig_info.get("blockTime", 0)
+        date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else None
+        for ev in extract_mint_burn(parsed):
+            if date:
+                delta_by_date[date] += ev["amount"] if ev["type"] == "mint" else -ev["amount"]
+                found += 1
 
-        for sig_info, parsed in zip(batch, results):
-            ts = sig_info.get("blockTime", 0)
-            date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else None
-            for ev in extract_mint_burn(parsed):
-                if date:
-                    delta_by_date[date] += ev["amount"] if ev["type"] == "mint" else -ev["amount"]
-                    found += 1
-
-        done = min(batch_start + BATCH_SIZE, total)
-        print(f"  {done}/{total} tx analysées, {found} mint/burn trouvés")
-        time.sleep(0.6)
+        print(f"  {i + 1}/{total} tx analysées, {found} mint/burn trouvés")
+        time.sleep(0.4)
 
     supply_history = []
     cumulative = initial_raw
