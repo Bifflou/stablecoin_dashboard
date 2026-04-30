@@ -533,23 +533,6 @@
 
     .toggle-btn svg { display: block; }
 
-    /* ── Theme toggle ────────────────────────────────────────────────────── */
-    .theme-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--bg-deep);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-sec);
-      cursor: pointer;
-      width: 32px;
-      height: 32px;
-      font-size: 1rem;
-      transition: background 0.15s, border-color 0.15s, color 0.15s;
-      flex-shrink: 0;
-    }
-    .theme-btn:hover { border-color: var(--border-hi); color: var(--text); }
 
     /* ── External tooltip ────────────────────────────────────────────────── */
     .chart-tooltip {
@@ -599,7 +582,10 @@
     <h1>CoinVertible Dashboard</h1>
     <span class="header-badge">SG Forge</span>
     <div style="display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0;">
-      <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Changer de thème">🌙</button>
+      <div class="toggle-wrap">
+        <button class="toggle-btn" id="btn-light" onclick="setTheme('light')">☀ Jour</button>
+        <button class="toggle-btn" id="btn-dark"  onclick="setTheme('dark')">🌙 Nuit</button>
+      </div>
       <div class="toggle-wrap">
         <button class="toggle-btn active" id="btn-usd" onclick="setCurrency('USD')">USD</button>
         <button class="toggle-btn"        id="btn-eur" onclick="setCurrency('EUR')">EUR</button>
@@ -1669,14 +1655,11 @@
       }
     }
 
-    function toggleTheme() {
-      const html = document.documentElement;
-      const isLight = html.getAttribute('data-theme') === 'light';
-      const next = isLight ? 'dark' : 'light';
-      html.setAttribute('data-theme', next);
-      localStorage.setItem('theme', next);
-      document.getElementById('theme-toggle').textContent = next === 'light' ? '🌙' : '☀️';
-      // Rebuild all charts with new colours
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      document.getElementById('btn-light').classList.toggle('active', theme === 'light');
+      document.getElementById('btn-dark').classList.toggle('active', theme === 'dark');
       buildGlobalCharts();
       buildTrackerTable();
     }
@@ -1712,9 +1695,10 @@
       state.usdcv.mcapData    = usdcvMcapRaw.map(s => applyUsdcvRates(s, eurusdRates));
       state.usdcv.holdersData = usdcvHolders;
 
-      // Sync theme icon with saved preference
+      // Sync theme buttons with saved preference
       const savedTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-      document.getElementById('theme-toggle').textContent = savedTheme === 'light' ? '🌙' : '☀️';
+      document.getElementById('btn-light').classList.toggle('active', savedTheme === 'light');
+      document.getElementById('btn-dark').classList.toggle('active', savedTheme === 'dark');
 
       buildKpiCards();
       buildGlobalCharts();
