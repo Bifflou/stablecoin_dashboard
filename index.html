@@ -484,6 +484,49 @@
 
     .chart-wrap { position: relative; height: 300px; }
 
+    /* ── Chart legend pills ──────────────────────────────────────────────── */
+    .chart-pills-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px 3px 8px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-sec);
+      font-size: 0.7rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.15s, background 0.15s, color 0.15s, opacity 0.15s;
+      user-select: none;
+    }
+    .legend-pill:hover {
+      border-color: var(--border-hi);
+      background: var(--bg-deep);
+      color: var(--text);
+    }
+    .legend-pill.is-hidden {
+      opacity: 0.38;
+      text-decoration: line-through;
+      text-decoration-color: var(--text-mute);
+    }
+    .legend-pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
     #last-updated { margin-top: 2rem; font-size: 0.72rem; color: var(--text-mute); }
 
     .card-header {
@@ -830,6 +873,40 @@
       };
     }
 
+    // ── HTML pill legend (shared by line & pie charts) ─────────────────────────
+    function buildPillLegend(canvasId, items, getHidden, onToggle) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return () => {};
+      const chartWrap = canvas.parentElement;
+      const card = chartWrap?.parentElement;
+      if (!card) return () => {};
+
+      // Remove old pills from a previous build
+      card.querySelector('.chart-pills-wrap')?.remove();
+
+      const wrap = document.createElement('div');
+      wrap.className = 'chart-pills-wrap';
+      card.insertBefore(wrap, chartWrap);
+
+      const pillEls = items.map((item, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'legend-pill';
+        btn.innerHTML = `<span class="legend-pill-dot" style="background:${item.color}"></span>${item.label}`;
+        btn.addEventListener('click', () => {
+          onToggle(i);
+          refresh();
+        });
+        wrap.appendChild(btn);
+        return btn;
+      });
+
+      function refresh() {
+        pillEls.forEach((btn, i) => btn.classList.toggle('is-hidden', getHidden(i)));
+      }
+      refresh();
+      return refresh;
+    }
+
     // ── Line chart ──────────────────────────────────────────────────────────────
     function buildLineChart(canvasId, stackedData, fmtVal, fmtAxis, rates) {
       const { labels, rawDates, paired, filled } = stackedData;
@@ -855,7 +932,7 @@
 
       const textSec = cv('--text-sec');
       const gridCol = cv('--border');
-      return new Chart(ctx, {
+      const lineChart = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets },
         options: {
@@ -863,15 +940,7 @@
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: {
-              display: true, position: 'top', align: 'end',
-              labels: { color: textSec, usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16, font: { size: 12 } },
-              onClick(e, legendItem, legend) {
-                const i = legendItem.datasetIndex;
-                const chart = legend.chart;
-                chart.isDatasetVisible(i) ? chart.hide(i) : chart.show(i);
-              },
-            },
+            legend: { display: false },
             tooltip: { enabled: false, external: makeTooltipHandler(fmtVal, paired, rates, rawDates) },
           },
           scales: {
@@ -880,6 +949,16 @@
           },
         },
       });
+
+      // Datasets are stored in reversed-paired order → pill[i] = dataset[i]
+      const pairedRev = [...paired].reverse();
+      buildPillLegend(
+        canvasId,
+        pairedRev.map(p => ({ color: p.chain.color, label: p.chain.label })),
+        i => !lineChart.isDatasetVisible(i),
+        i => { lineChart.isDatasetVisible(i) ? lineChart.hide(i) : lineChart.show(i); }
+      );
+      return lineChart;
     }
 
     // ── Pie chart ───────────────────────────────────────────────────────────────
@@ -978,8 +1057,9 @@
       };
 
       let prevHoveredIdx = -1;
+      let refreshPills = () => {};
 
-      return new Chart(ctx, {
+      const pieChart = new Chart(ctx, {
         type: 'pie',
         data: {
           labels: active.map(d => d.chain.label),
@@ -996,7 +1076,7 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          layout: { padding: { top: 70, bottom: 45, left: 120, right: 120 } },
+          layout: { padding: { top: 70, bottom: 70, left: 120, right: 120 } },
           animation: { animateRotate: true, duration: 800, easing: 'easeInOutQuart' },
           onHover(event, elements, chart) {
             const idx = elements.length > 0 ? elements[0].index : -1;
@@ -1018,22 +1098,10 @@
               chart.getDataVisibility(j) ? d.chain.color + 'CC' : d.chain.color + '20'
             );
             chart.update();
+            refreshPills();
           },
           plugins: {
-            legend: {
-              display: true, position: 'bottom',
-              labels: { color: cv('--text-sec'), usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 14, font: { size: 11 } },
-              onClick(e, legendItem, legend) {
-                const i = legendItem.index;
-                const chart = legend.chart;
-                chart.toggleDataVisibility(i);
-                prevHoveredIdx = -1;
-                chart.data.datasets[0].backgroundColor = active.map((d, j) =>
-                  chart.getDataVisibility(j) ? d.chain.color + 'CC' : d.chain.color + '20'
-                );
-                chart.update();
-              },
-            },
+            legend: { display: false },
             tooltip: {
               backgroundColor: cv('--chart-bg'), borderColor: cv('--border-hi'), borderWidth: 1,
               padding: 12, displayColors: false,
@@ -1045,6 +1113,21 @@
         },
         plugins: [outerLabelsPlugin],
       });
+
+      refreshPills = buildPillLegend(
+        canvasId,
+        active.map(d => ({ color: d.chain.color, label: d.chain.label })),
+        i => !pieChart.getDataVisibility(i),
+        i => {
+          pieChart.toggleDataVisibility(i);
+          prevHoveredIdx = -1;
+          pieChart.data.datasets[0].backgroundColor = active.map((d, j) =>
+            pieChart.getDataVisibility(j) ? d.chain.color + 'CC' : d.chain.color + '20'
+          );
+          pieChart.update();
+        }
+      );
+      return pieChart;
     }
 
     // ── EUR/USD rates ───────────────────────────────────────────────────────────
