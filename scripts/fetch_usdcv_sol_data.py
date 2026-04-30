@@ -2,17 +2,38 @@ import requests
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
-HELIUS_API_KEY = os.environ.get("HELIUS_API_KEY")
-MINT_ADDRESS = "8smindLdDuySY6i2bStQX9o8DVhALCXCMbNxD98unx35"
-HELIUS_RPC = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-SPL_PROGRAMS = {"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"}
+HELIUS_API_KEY       = os.environ.get("HELIUS_API_KEY")
+MINT_ADDRESS         = "8smindLdDuySY6i2bStQX9o8DVhALCXCMbNxD98unx35"
+HELIUS_RPC           = f"https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+SPL_PROGRAMS         = {"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"}
 
-MAX_RETRIES = 8
-BATCH_SIZE  = 3    # transactions par batch JSON-RPC (Helius limite la taille du payload)
+SUPPLY_FILE          = "data/usdcv_sol_marketcap.json"
+HOLDERS_FILE         = "data/usdcv_sol_holders.json"
+KNOWN_HOLDERS_FILE   = "data/usdcv_sol_known_holders.json"  # cache {address: first_seen_date}
 
+LOOKBACK_DAYS        = 3    # re-fetch les N derniers jours pour sécurité
+MAX_RETRIES          = 8
+BATCH_SIZE           = 3    # getTransaction par batch (Helius payload limit)
+
+
+# ── Helpers I/O ────────────────────────────────────────────────────────────────
+
+def load_json(path, default=None):
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return default if default is not None else []
+
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+# ── RPC ────────────────────────────────────────────────────────────────────────
 
 def rpc(method, params):
     """Appel JSON-RPC unique avec retry + backoff exponentiel sur 429."""
@@ -34,7 +55,7 @@ def rpc(method, params):
 
 
 def rpc_batch(requests_list):
-    """Envoie plusieurs requêtes JSON-RPC en un seul appel HTTP (batch)."""
+    """Batch JSON-RPC — plusieurs requêtes en un seul appel HTTP."""
     payload = [
         {"jsonrpc": "2.0", "id": i, "method": r["method"], "params": r["params"]}
         for i, r in enumerate(requests_list)
@@ -54,12 +75,44 @@ def rpc_batch(requests_list):
     raise RuntimeError(f"Échec batch après {MAX_RETRIES} tentatives")
 
 
+# ── Supply ─────────────────────────────────────────────────────────────────────
+
 def get_token_decimals():
     result = rpc("getAccountInfo", [MINT_ADDRESS, {"encoding": "jsonParsed"}])
     return result["value"]["data"]["parsed"]["info"]["decimals"]
 
 
-def get_mint_signatures():
+def get_signatures_since(cutoff_ts):
+    """Récupère seulement les signatures plus récentes que cutoff_ts (epoch sec)."""
+    all_sigs = []
+    before = None
+
+    while True:
+        params = {"limit": 1000}
+        if before:
+            params["before"] = before
+
+        result = rpc("getSignaturesForAddress", [MINT_ADDRESS, params])
+        if not result:
+            break
+
+        recent = [s for s in result if (s.get("blockTime") or 0) >= cutoff_ts]
+        all_sigs.extend(recent)
+        print(f"  {len(recent)} récentes / {len(result)} récupérées (total: {len(all_sigs)})")
+
+        if len(recent) < len(result):   # on a atteint des signatures plus anciennes
+            break
+        if len(result) < 1000:
+            break
+
+        before = result[-1]["signature"]
+        time.sleep(0.2)
+
+    return list(reversed(all_sigs))     # ordre chronologique
+
+
+def get_all_signatures():
+    """Fetch complet — utilisé uniquement au premier run."""
     all_sigs = []
     before = None
 
@@ -79,7 +132,7 @@ def get_mint_signatures():
             break
 
         before = result[-1]["signature"]
-        time.sleep(0.15)
+        time.sleep(0.2)
 
     return list(reversed(all_sigs))
 
@@ -89,7 +142,7 @@ def extract_mint_burn(parsed_tx):
     if not parsed_tx:
         return events
 
-    def scan_instructions(instructions):
+    def scan(instructions):
         for ix in instructions:
             if ix.get("programId") not in SPL_PROGRAMS:
                 continue
@@ -97,7 +150,7 @@ def extract_mint_burn(parsed_tx):
             if not isinstance(parsed, dict):
                 continue
             ix_type = parsed.get("type", "")
-            info = parsed.get("info", {})
+            info    = parsed.get("info", {})
             if info.get("mint") != MINT_ADDRESS:
                 continue
             if ix_type in ("mintTo", "mintToChecked"):
@@ -107,36 +160,37 @@ def extract_mint_burn(parsed_tx):
                 amt = info.get("amount") or info.get("tokenAmount", {}).get("amount", 0)
                 events.append({"type": "burn", "amount": int(amt)})
 
-    tx = parsed_tx.get("transaction", {})
+    tx  = parsed_tx.get("transaction", {})
     msg = tx.get("message", {})
-    scan_instructions(msg.get("instructions", []))
-
+    scan(msg.get("instructions", []))
     for inner in parsed_tx.get("meta", {}).get("innerInstructions", []):
-        scan_instructions(inner.get("instructions", []))
+        scan(inner.get("instructions", []))
 
     return events
 
 
-def reconstruct_supply(signatures, decimals):
+def reconstruct_supply(signatures, decimals, initial_raw=0):
+    """
+    Reconstruit l'historique supply à partir des signatures données.
+    initial_raw : cumul brut (avant division par 10^decimals) à partir duquel démarrer.
+    """
     delta_by_date = defaultdict(int)
     found = 0
     total = len(signatures)
 
     for batch_start in range(0, total, BATCH_SIZE):
         batch = signatures[batch_start:batch_start + BATCH_SIZE]
-
-        reqs = [
+        reqs  = [
             {"method": "getTransaction", "params": [s["signature"], {
                 "encoding": "jsonParsed",
                 "maxSupportedTransactionVersion": 0,
             }]}
             for s in batch
         ]
-
         results = rpc_batch(reqs)
 
         for sig_info, parsed in zip(batch, results):
-            ts = sig_info.get("blockTime", 0)
+            ts   = sig_info.get("blockTime", 0)
             date = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else None
             for ev in extract_mint_burn(parsed):
                 if date:
@@ -145,16 +199,18 @@ def reconstruct_supply(signatures, decimals):
 
         done = min(batch_start + BATCH_SIZE, total)
         print(f"  {done}/{total} tx analysées, {found} mint/burn trouvés")
-        time.sleep(0.6)  # pause entre batches
+        time.sleep(0.6)
 
     supply_history = []
-    cumulative = 0
+    cumulative = initial_raw
     for date in sorted(delta_by_date.keys()):
         cumulative += delta_by_date[date]
         supply_history.append({"date": date, "supply": round(cumulative / (10 ** decimals), 2)})
 
     return supply_history
 
+
+# ── Holders ────────────────────────────────────────────────────────────────────
 
 def get_token_accounts():
     all_accounts = []
@@ -166,9 +222,9 @@ def get_token_accounts():
             params["cursor"] = cursor
 
         payload = {"jsonrpc": "2.0", "id": 1, "method": "getTokenAccounts", "params": params}
-        resp = requests.post(HELIUS_RPC, json=payload, timeout=60)
+        resp    = requests.post(HELIUS_RPC, json=payload, timeout=60)
         resp.raise_for_status()
-        result = resp.json().get("result", {})
+        result  = resp.json().get("result", {})
 
         accounts = result.get("token_accounts", [])
         all_accounts.extend(accounts)
@@ -184,7 +240,7 @@ def get_token_accounts():
 
 
 def get_first_seen_date(address):
-    before = None
+    before   = None
     last_sig = None
 
     while True:
@@ -202,42 +258,51 @@ def get_first_seen_date(address):
             break
 
         before = result[-1]["signature"]
-        time.sleep(0.1)
+        time.sleep(0.2)
 
     if last_sig and last_sig.get("blockTime"):
         return datetime.fromtimestamp(last_sig["blockTime"], tz=timezone.utc).strftime("%Y-%m-%d")
     return None
 
 
-def reconstruct_holders(token_accounts):
+def build_holders_history(token_accounts, known_holders):
+    """
+    Met à jour known_holders avec les nouveaux comptes,
+    puis reconstruit l'historique complet à partir du cache.
+    """
     active = [a for a in token_accounts if float(a.get("amount", 0)) > 0]
-    print(f"  {len(active)} comptes actifs à dater")
+    new_accounts = [a for a in active if a.get("address", "") not in known_holders]
 
-    events_by_date = defaultdict(int)
+    print(f"  {len(active)} comptes actifs — {len(new_accounts)} nouveaux à dater")
 
-    for i, acc in enumerate(active):
+    for i, acc in enumerate(new_accounts):
         address = acc.get("address", "")
         if not address:
             continue
-
         date = get_first_seen_date(address)
         if date:
-            events_by_date[date] += 1
-
+            known_holders[address] = date
         if (i + 1) % 10 == 0:
-            print(f"  {i + 1}/{len(active)} comptes datés")
-
+            print(f"  {i + 1}/{len(new_accounts)} nouveaux comptes datés")
         time.sleep(0.3)
+
+    # Reconstruction depuis le cache complet (tous holders connus actifs)
+    active_addrs    = {a.get("address", "") for a in active}
+    events_by_date  = defaultdict(int)
+    for addr, date in known_holders.items():
+        if addr in active_addrs and date:
+            events_by_date[date] += 1
 
     holders_history = []
     cumulative = 0
-
     for date in sorted(events_by_date.keys()):
         cumulative += events_by_date[date]
         holders_history.append({"date": date, "holders": cumulative})
 
     return holders_history
 
+
+# ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
     os.makedirs("data", exist_ok=True)
@@ -246,33 +311,55 @@ def main():
     decimals = get_token_decimals()
     print(f"  Decimals: {decimals}")
 
-    print("Récupération des signatures du compte mint...")
-    signatures = get_mint_signatures()
-    print(f"  {len(signatures)} signatures trouvées")
+    # ── Supply (mode incrémental) ──────────────────────────────────────────────
+    existing_supply = load_json(SUPPLY_FILE)
 
-    print("Analyse des transactions (mintTo / burn)...")
-    supply_history = reconstruct_supply(signatures, decimals)
-    print(f"  {len(supply_history)} jours avec activité supply")
+    if existing_supply:
+        last_date   = existing_supply[-1]["date"]
+        cutoff_date = (datetime.strptime(last_date, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+        cutoff_ts   = datetime.strptime(cutoff_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()
 
-    if not supply_history:
+        # Cumul brut juste avant le cutoff (base de départ pour le recalcul)
+        baseline_supply = 0
+        for pt in existing_supply:
+            if pt["date"] < cutoff_date:
+                baseline_supply = pt["supply"]
+        initial_raw = int(baseline_supply * (10 ** decimals))
+
+        print(f"Mode incrémental — signatures depuis {cutoff_date} (baseline: {baseline_supply:,.2f})")
+        signatures = get_signatures_since(cutoff_ts)
+        print(f"  {len(signatures)} nouvelles signatures")
+
+        new_supply = reconstruct_supply(signatures, decimals, initial_raw)
+
+        # Conserver l'historique avant cutoff, remplacer depuis cutoff
+        merged_supply = [pt for pt in existing_supply if pt["date"] < cutoff_date] + new_supply
+    else:
+        print("Premier fetch complet...")
+        signatures    = get_all_signatures()
+        print(f"  {len(signatures)} signatures trouvées")
+        merged_supply = reconstruct_supply(signatures, decimals)
+
+    if not merged_supply:
         print("Aucun mintTo/burn trouvé.")
         return
 
+    print(f"  {len(merged_supply)} jours supply — dernier: {merged_supply[-1]}")
+
+    # ── Holders (mode incrémental via cache d'adresses) ───────────────────────
     print("Récupération des comptes token (holders)...")
     token_accounts = get_token_accounts()
 
+    known_holders = load_json(KNOWN_HOLDERS_FILE, default={})
     print("Reconstruction de l'historique des holders...")
-    holders_history = reconstruct_holders(token_accounts)
+    holders_history = build_holders_history(token_accounts, known_holders)
 
-    with open("data/usdcv_sol_marketcap.json", "w") as f:
-        json.dump(supply_history, f)
+    # ── Sauvegarde ────────────────────────────────────────────────────────────
+    save_json(SUPPLY_FILE,        merged_supply)
+    save_json(HOLDERS_FILE,       holders_history)
+    save_json(KNOWN_HOLDERS_FILE, known_holders)
 
-    with open("data/usdcv_sol_holders.json", "w") as f:
-        json.dump(holders_history, f)
-
-    print(f"Sauvegardé : {len(supply_history)} points supply, {len(holders_history)} points holders")
-    if supply_history:
-        print(f"  Dernier point : {supply_history[-1]}")
+    print(f"Sauvegardé : {len(merged_supply)} points supply, {len(holders_history)} points holders")
 
 
 if __name__ == "__main__":
