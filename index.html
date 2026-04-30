@@ -611,7 +611,7 @@
         if (!activeItems.length) return;
         const total = activeItems.reduce((s, i) => s + i.raw, 0);
 
-        const rows = [...activeItems].reverse().map(item => {
+        const rows = [...activeItems].sort((a, b) => (b.raw || 0) - (a.raw || 0)).map(item => {
           const chain = paired.find(p => p.chain.label === item.dataset.label)?.chain || {};
           return `<div class="tt-row">
             <div class="tt-dot" style="background:${chain.color || '#888'}"></div>
