@@ -1526,15 +1526,34 @@
       if (!canvas) return; // accordion not open
 
       if (type === 'mcap') {
-        if (s.mcapChart) { s.mcapChart.destroy(); s.mcapChart = null; }
-        const wrap = canvas.parentElement;
-        wrap.innerHTML = `<canvas id="${canvasId}"></canvas>`;
         const isUSD    = currentCurrency === 'USD';
         const fmtVal   = isUSD ? fmtUSD : fmtEUR;
         const fmtAxis  = isUSD ? fmtAxisUSD : fmtAxisEUR;
         const valueKey = token === 'eurcv'
           ? (isUSD ? 'marketcap' : 'supply')
           : (isUSD ? 'supply'    : 'supply_eur');
+
+        // Smooth in-place update when just switching currency on a line chart
+        if (isSmoothing && s.mcapChart && s.mcapMode === 'line') {
+          const stacked = buildStacked(chains, s.mcapData, valueKey);
+          stacked.filled.forEach((fillData, pi) => {
+            const di = stacked.paired.length - 1 - pi;
+            if (s.mcapChart.data.datasets[di]) s.mcapChart.data.datasets[di].data = fillData;
+          });
+          s.mcapChart.data.labels = stacked.labels;
+          s.mcapChart.options.scales.y.ticks.callback = fmtAxis;
+          s.mcapChart.options.plugins.tooltip.external = makeTooltipHandler(
+            fmtVal, stacked.paired, eurusdRates, stacked.rawDates
+          );
+          s.mcapChart.update();
+          const titleEl = document.getElementById(`${token}-mcap-title`);
+          if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+          return;
+        }
+
+        if (s.mcapChart) { s.mcapChart.destroy(); s.mcapChart = null; }
+        const wrap = canvas.parentElement;
+        wrap.innerHTML = `<canvas id="${canvasId}"></canvas>`;
         if (s.mcapMode === 'line') {
           s.mcapChart = buildLineChart(canvasId, buildStacked(chains, s.mcapData, valueKey), fmtVal, fmtAxis, eurusdRates);
         } else {
@@ -1850,6 +1869,24 @@
       buildTrackerTable();
     }
 
+    // Update only the mcap/change cell values in existing rows — no DOM rebuild
+    function refreshTrackerValues() {
+      const rows = getTokenRows();
+      const mcapSym = currentCurrency === 'USD' ? '$' : '€';
+      rows.forEach(token => {
+        const tr = document.querySelector(`.tracker-row[data-token="${token.id}"]`);
+        if (!tr) return;
+        tr.querySelector('.td-mcap').innerHTML    = fmtKpiMcap(token.mcap, mcapSym);
+        tr.querySelector('.col-1d').innerHTML     = fmtChg(token.chg1d).html;
+        tr.querySelector('.col-7d').innerHTML     = fmtChg(token.chg7d).html;
+        tr.querySelector('.col-1m').innerHTML     = fmtChg(token.chg1m).html;
+      });
+      if (openToken) {
+        const titleEl = document.getElementById(`${openToken}-mcap-title`);
+        if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+      }
+    }
+
     function setCurrency(currency) {
       if (currency === currentCurrency) return;
       currentCurrency = currency;
@@ -1857,9 +1894,10 @@
       document.getElementById('btn-eur').classList.toggle('active', currency === 'EUR');
       buildKpiCards();
       isSmoothing = true;
-      buildGlobalCharts();   // line charts update data in place → smooth animation
+      buildGlobalCharts();                         // global line charts: smooth in-place
+      if (openToken) rebuildChart(openToken, 'mcap'); // accordion mcap chart: smooth in-place
       isSmoothing = false;
-      buildTrackerTable();   // table values + open accordion charts (full rebuild)
+      refreshTrackerValues();                      // update cell values without DOM rebuild
     }
 
     // ── Init ────────────────────────────────────────────────────────────────────
