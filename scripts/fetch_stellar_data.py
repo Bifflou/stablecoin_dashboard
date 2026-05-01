@@ -85,7 +85,7 @@ def get_current_supply_and_holders():
             if bal > 0:
                 total_supply += bal
                 addr = r.get("account", "")
-                if addr and addr != ISSUER:
+                if addr and addr not in (ISSUER, ADMIN):
                     holder_count += 1
         next_href = data.get("_links", {}).get("next", {}).get("href")
         if not next_href or not records:
@@ -256,23 +256,23 @@ def build_holders_snapshot(ops, prev_balances=None):
         for event in events_by_date[date]:
             if event[0] == "payment":
                 _, src, dst, amount = event
-                if src and src != ISSUER:
+                if src and src not in (ISSUER, ADMIN):
                     balances[src] = balances.get(src, 0.0) - amount
-                if dst and dst != ISSUER:
+                if dst and dst not in (ISSUER, ADMIN):
                     balances[dst] = balances.get(dst, 0.0) + amount
 
             elif event[0] == "sac":
                 _, ctype, from_, to_, amount = event
                 if ctype == "mint":
-                    if to_ and to_ != ISSUER:
+                    if to_ and to_ not in (ISSUER, ADMIN):
                         balances[to_] = balances.get(to_, 0.0) + amount
                 elif ctype in ("burn", "clawback"):
-                    if from_ and from_ != ISSUER:
+                    if from_ and from_ not in (ISSUER, ADMIN):
                         balances[from_] = balances.get(from_, 0.0) - amount
                 elif ctype == "transfer":
-                    if from_ and from_ != ISSUER:
+                    if from_ and from_ not in (ISSUER, ADMIN):
                         balances[from_] = balances.get(from_, 0.0) - amount
-                    if to_ and to_ != ISSUER:
+                    if to_ and to_ not in (ISSUER, ADMIN):
                         balances[to_] = balances.get(to_, 0.0) + amount
 
             elif event[0] == "change_trust":
