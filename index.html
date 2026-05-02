@@ -815,6 +815,22 @@
     }
 
     // ── External tooltip ────────────────────────────────────────────────────────
+
+    // Global registry so scroll / touch-outside can dismiss any open tooltip
+    const allTooltipEls = new Set();
+    function hideAllTooltips() {
+      allTooltipEls.forEach(el => { el.style.opacity = '0'; });
+    }
+    // Dismiss on scroll (mobile swipe or desktop wheel)
+    window.addEventListener('scroll', hideAllTooltips, { passive: true, capture: true });
+    // Dismiss when touching outside a chart canvas; keep the tooltip of the touched chart
+    document.addEventListener('touchstart', e => {
+      const canvas = e.target.closest('canvas');
+      allTooltipEls.forEach(el => {
+        if (el._chartCanvas !== canvas) el.style.opacity = '0';
+      });
+    }, { passive: true });
+
     function makeTooltipHandler(fmtVal, paired, rates, rawDates) {
       function getRateForDate(isoDate) {
         if (!rates || !isoDate) return null;
@@ -829,7 +845,9 @@
         if (!el) {
           el = document.createElement('div');
           el.className = 'chart-tooltip';
+          el._chartCanvas = chart.canvas;
           document.body.appendChild(el);
+          allTooltipEls.add(el);
           chart._ttEl = el;
         }
 
