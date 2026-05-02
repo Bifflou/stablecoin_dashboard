@@ -735,11 +735,11 @@
             <th class="th-sortable th-name" data-sort="name" style="width:190px">Token <span class="sort-icon" id="si-name">↕</span></th>
             <th class="col-ticker" style="width:72px">Ticker</th>
             <th class="col-peg" style="width:60px">Peg</th>
-            <th class="col-issuer" style="width:88px">Émetteur</th>
             <th class="col-type" style="width:96px">Type</th>
+            <th class="col-issuer" style="width:88px">Émetteur</th>
             <th class="col-mica" style="width:80px">MiCA</th>
-            <th class="col-integration" style="width:80px">Intégration</th>
             <th class="col-chains" style="width:130px">Chaînes</th>
+            <th class="col-integration" style="width:80px">Intégration</th>
             <th class="th-sortable th-right col-holders" data-sort="holders" style="width:100px">Holders <span class="sort-icon" id="si-holders">↕</span></th>
             <th class="th-sortable th-right col-mcap" data-sort="mcap" style="width:120px">Market Cap <span class="sort-icon" id="si-mcap">↓</span></th>
             <th class="th-right col-1d" style="width:64px">1J</th>
@@ -1823,11 +1823,11 @@
           </td>
           <td class="td-ticker col-ticker">${token.ticker}</td>
           <td class="td-ticker col-peg">${token.peg ? token.peg.code : '—'}</td>
-          <td class="td-ticker col-issuer">${token.issuer || '—'}</td>
           <td class="td-ticker col-type">${token.type || '—'}</td>
+          <td class="td-ticker col-issuer">${token.issuer || '—'}</td>
           <td class="td-ticker col-mica">${token.mica || '—'}</td>
-          <td class="td-ticker col-integration">${token.integration || '—'}</td>
           <td class="td-chains col-chains">${chainLogosHtml}</td>
+          <td class="td-ticker col-integration">${token.integration || '—'}</td>
           <td class="td-holders col-holders" title="* Comptage non dédupliqué cross-chaîne">${fmtSpaced(token.holders)}<span class="holders-star">*</span></td>
           <td class="td-mcap col-mcap">${fmtKpiMcap(token.mcap, mcapSym)}</td>
           <td class="td-change col-1d">${fmtChg(token.chg1d).html}</td>
