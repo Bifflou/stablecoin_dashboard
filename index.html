@@ -135,6 +135,7 @@
       margin-bottom: 1rem;
     }
     .tracker-view-header .section-title { margin-bottom: 0; }
+    .toggle-chg-mode { margin-left: auto; }
 
     /* ── Chain table grouped header ──────────────────────────────────────── */
     .th-group {
@@ -758,6 +759,10 @@
       <div class="toggle-wrap">
         <button class="toggle-btn active" id="btn-view-token" onclick="setTrackerView('token')">Par token</button>
         <button class="toggle-btn" id="btn-view-chain" onclick="setTrackerView('chain')">Par blockchain</button>
+      </div>
+      <div class="toggle-wrap toggle-chg-mode">
+        <button class="toggle-btn active" id="btn-chg-pct" onclick="setChangeMode('pct')">%</button>
+        <button class="toggle-btn" id="btn-chg-abs" onclick="setChangeMode('abs')">Nb</button>
       </div>
     </div>
 
@@ -1800,8 +1805,34 @@
       return (current - prev) / prev * 100;
     }
 
-    function fmtChg(pct) {
-      if (pct === null) return { html: '<span class="chg-zero">—</span>' };
+    function absDiff(current, prev) {
+      if (prev == null) return null;
+      return current - prev;
+    }
+
+    // fmtChg(pct, abs, type)
+    //   type: 'mcap' | 'holders'
+    //   renders % or absolute depending on currentChangeMode
+    function fmtChg(pct, abs, type) {
+      if (currentChangeMode === 'abs' && type) {
+        if (abs === null || abs === undefined) return { html: '<span class="chg-zero">—</span>' };
+        const cls  = abs > 0 ? 'chg-pos' : abs < 0 ? 'chg-neg' : 'chg-zero';
+        const sign = abs > 0 ? '+' : abs < 0 ? '−' : '';
+        const a    = Math.abs(abs);
+        if (type === 'mcap') {
+          const sym = currentCurrency === 'USD' ? '$' : '€';
+          let num;
+          if (a >= 1e9)      num = (a / 1e9).toFixed(2) + 'B';
+          else if (a >= 1e6) num = (a / 1e6).toFixed(2) + 'M';
+          else if (a >= 1e3) num = (a / 1e3).toFixed(1) + 'K';
+          else               num = a.toFixed(0);
+          return { html: `<span class="${cls}">${sign}${num}${sym}</span>` };
+        }
+        // holders
+        return { html: `<span class="${cls}">${sign}${Math.round(a)}</span>` };
+      }
+      // pct mode (default / fallback)
+      if (pct === null || pct === undefined) return { html: '<span class="chg-zero">—</span>' };
       const cls  = pct > 0 ? 'chg-pos' : pct < 0 ? 'chg-neg' : 'chg-zero';
       const sign = pct > 0 ? '+' : '';
       return { html: `<span class="${cls}">${sign}${pct.toFixed(2)}%</span>` };
@@ -1819,27 +1850,37 @@
         // Merged market cap series
         const merged = totalMcapSeries(def.id, mcKey);
         let chg1d = null, chg7d = null, chg1m = null;
+        let chg1dAbs = null, chg7dAbs = null, chg1mAbs = null;
         if (merged.length) {
           const ld = merged[merged.length - 1].date;
-          chg1d = pctChange(mcap, valueAtDate(merged, isoSubDays(ld, 1)));
-          chg7d = pctChange(mcap, valueAtDate(merged, isoSubDays(ld, 7)));
-          chg1m = pctChange(mcap, valueAtDate(merged, isoSubDays(ld, 30)));
+          const prev1d = valueAtDate(merged, isoSubDays(ld, 1));
+          const prev7d = valueAtDate(merged, isoSubDays(ld, 7));
+          const prev1m = valueAtDate(merged, isoSubDays(ld, 30));
+          chg1d = pctChange(mcap, prev1d); chg1dAbs = absDiff(mcap, prev1d);
+          chg7d = pctChange(mcap, prev7d); chg7dAbs = absDiff(mcap, prev7d);
+          chg1m = pctChange(mcap, prev1m); chg1mAbs = absDiff(mcap, prev1m);
         }
 
         // Merged holders series
         const mergedH = mergeSeries(state[def.id].holdersData.map(s => ({ series: s, key: 'holders' })));
         let holdChg1d = null, holdChg7d = null, holdChg1m = null;
+        let holdChg1dAbs = null, holdChg7dAbs = null, holdChg1mAbs = null;
         if (mergedH.length) {
           const ld = mergedH[mergedH.length - 1].date;
-          holdChg1d = pctChange(holders, valueAtDate(mergedH, isoSubDays(ld, 1)));
-          holdChg7d = pctChange(holders, valueAtDate(mergedH, isoSubDays(ld, 7)));
-          holdChg1m = pctChange(holders, valueAtDate(mergedH, isoSubDays(ld, 30)));
+          const hPrev1d = valueAtDate(mergedH, isoSubDays(ld, 1));
+          const hPrev7d = valueAtDate(mergedH, isoSubDays(ld, 7));
+          const hPrev1m = valueAtDate(mergedH, isoSubDays(ld, 30));
+          holdChg1d = pctChange(holders, hPrev1d); holdChg1dAbs = absDiff(holders, hPrev1d);
+          holdChg7d = pctChange(holders, hPrev7d); holdChg7dAbs = absDiff(holders, hPrev7d);
+          holdChg1m = pctChange(holders, hPrev1m); holdChg1mAbs = absDiff(holders, hPrev1m);
         }
 
         return {
           ...def, mcap, holders,
           chg1d, chg7d, chg1m,
+          chg1dAbs, chg7dAbs, chg1mAbs,
           holdChg1d, holdChg7d, holdChg1m,
+          holdChg1dAbs, holdChg7dAbs, holdChg1mAbs,
         };
       });
     }
@@ -1863,20 +1904,34 @@
         const mergedMcap    = mergeSeries(mcapInputs);
         const mergedHolders = mergeSeries(holdInputs);
         let mcapChg1d = null, mcapChg7d = null, mcapChg1m = null;
+        let mcapChg1dAbs = null, mcapChg7dAbs = null, mcapChg1mAbs = null;
         let holdChg1d = null, holdChg7d = null, holdChg1m = null;
+        let holdChg1dAbs = null, holdChg7dAbs = null, holdChg1mAbs = null;
         if (mergedMcap.length) {
           const ld = mergedMcap[mergedMcap.length - 1].date;
-          mcapChg1d = pctChange(mcap, valueAtDate(mergedMcap, isoSubDays(ld, 1)));
-          mcapChg7d = pctChange(mcap, valueAtDate(mergedMcap, isoSubDays(ld, 7)));
-          mcapChg1m = pctChange(mcap, valueAtDate(mergedMcap, isoSubDays(ld, 30)));
+          const mp1d = valueAtDate(mergedMcap, isoSubDays(ld, 1));
+          const mp7d = valueAtDate(mergedMcap, isoSubDays(ld, 7));
+          const mp1m = valueAtDate(mergedMcap, isoSubDays(ld, 30));
+          mcapChg1d = pctChange(mcap, mp1d); mcapChg1dAbs = absDiff(mcap, mp1d);
+          mcapChg7d = pctChange(mcap, mp7d); mcapChg7dAbs = absDiff(mcap, mp7d);
+          mcapChg1m = pctChange(mcap, mp1m); mcapChg1mAbs = absDiff(mcap, mp1m);
         }
         if (mergedHolders.length) {
           const ld = mergedHolders[mergedHolders.length - 1].date;
-          holdChg1d = pctChange(holders, valueAtDate(mergedHolders, isoSubDays(ld, 1)));
-          holdChg7d = pctChange(holders, valueAtDate(mergedHolders, isoSubDays(ld, 7)));
-          holdChg1m = pctChange(holders, valueAtDate(mergedHolders, isoSubDays(ld, 30)));
+          const hp1d = valueAtDate(mergedHolders, isoSubDays(ld, 1));
+          const hp7d = valueAtDate(mergedHolders, isoSubDays(ld, 7));
+          const hp1m = valueAtDate(mergedHolders, isoSubDays(ld, 30));
+          holdChg1d = pctChange(holders, hp1d); holdChg1dAbs = absDiff(holders, hp1d);
+          holdChg7d = pctChange(holders, hp7d); holdChg7dAbs = absDiff(holders, hp7d);
+          holdChg1m = pctChange(holders, hp1m); holdChg1mAbs = absDiff(holders, hp1m);
         }
-        return { ...def, mcap, holders, mcapChg1d, mcapChg7d, mcapChg1m, holdChg1d, holdChg7d, holdChg1m };
+        return {
+          ...def, mcap, holders,
+          mcapChg1d, mcapChg7d, mcapChg1m,
+          mcapChg1dAbs, mcapChg7dAbs, mcapChg1mAbs,
+          holdChg1d, holdChg7d, holdChg1m,
+          holdChg1dAbs, holdChg7dAbs, holdChg1mAbs,
+        };
       });
     }
 
@@ -2025,13 +2080,13 @@
           <td class="td-ticker cchain-native">${chain.nativeToken}</td>
           <td class="td-chains cchain-tokens"><div class="chain-logos">${tokenLogosHtml}</div></td>
           <td class="td-holders th-right">${fmtSpaced(chain.holders)}</td>
-          <td class="td-change th-right cchain-h1d">${fmtChg(chain.holdChg1d).html}</td>
-          <td class="td-change th-right cchain-h7d">${fmtChg(chain.holdChg7d).html}</td>
-          <td class="td-change th-right cchain-h1m">${fmtChg(chain.holdChg1m).html}</td>
+          <td class="td-change th-right cchain-h1d">${fmtChg(chain.holdChg1d, chain.holdChg1dAbs, 'holders').html}</td>
+          <td class="td-change th-right cchain-h7d">${fmtChg(chain.holdChg7d, chain.holdChg7dAbs, 'holders').html}</td>
+          <td class="td-change th-right cchain-h1m">${fmtChg(chain.holdChg1m, chain.holdChg1mAbs, 'holders').html}</td>
           <td class="td-mcap th-right">${fmtKpiMcap(chain.mcap, mcapSym)}</td>
-          <td class="td-change th-right cchain-mc1d">${fmtChg(chain.mcapChg1d).html}</td>
-          <td class="td-change th-right cchain-mc7d">${fmtChg(chain.mcapChg7d).html}</td>
-          <td class="td-change th-right cchain-mc1m">${fmtChg(chain.mcapChg1m).html}</td>
+          <td class="td-change th-right cchain-mc1d">${fmtChg(chain.mcapChg1d, chain.mcapChg1dAbs, 'mcap').html}</td>
+          <td class="td-change th-right cchain-mc7d">${fmtChg(chain.mcapChg7d, chain.mcapChg7dAbs, 'mcap').html}</td>
+          <td class="td-change th-right cchain-mc1m">${fmtChg(chain.mcapChg1m, chain.mcapChg1mAbs, 'mcap').html}</td>
           <td class="td-arrow"><span class="row-arrow${isOpen ? ' open' : ''}">›</span></td>
         `;
         tr.addEventListener('click', () => toggleChainAccordion(chain.id));
@@ -2053,6 +2108,16 @@
         trExp.appendChild(td);
         tbody.appendChild(trExp);
       });
+    }
+
+    // ── Change mode toggle (%  vs absolute) ─────────────────────────────────────
+    let currentChangeMode = 'pct';
+    function setChangeMode(mode) {
+      currentChangeMode = mode;
+      document.getElementById('btn-chg-pct').classList.toggle('active', mode === 'pct');
+      document.getElementById('btn-chg-abs').classList.toggle('active', mode === 'abs');
+      refreshTrackerValues();
+      if (currentTrackerView === 'chain') buildChainTable();
     }
 
     // ── Tracker view toggle ─────────────────────────────────────────────────────
@@ -2160,13 +2225,13 @@
           <td class="td-ticker col-mica">${token.mica || '—'}</td>
           <td class="td-chains col-chains">${chainLogosHtml}</td>
           <td class="td-holders col-holders" title="* Comptage non dédupliqué cross-chaîne">${fmtSpaced(token.holders)}<span class="holders-star">*</span></td>
-          <td class="td-change col-h1d">${fmtChg(token.holdChg1d).html}</td>
-          <td class="td-change col-h7d">${fmtChg(token.holdChg7d).html}</td>
-          <td class="td-change col-h1m">${fmtChg(token.holdChg1m).html}</td>
+          <td class="td-change col-h1d">${fmtChg(token.holdChg1d, token.holdChg1dAbs, 'holders').html}</td>
+          <td class="td-change col-h7d">${fmtChg(token.holdChg7d, token.holdChg7dAbs, 'holders').html}</td>
+          <td class="td-change col-h1m">${fmtChg(token.holdChg1m, token.holdChg1mAbs, 'holders').html}</td>
           <td class="td-mcap col-mcap">${fmtKpiMcap(token.mcap, mcapSym)}</td>
-          <td class="td-change col-1d">${fmtChg(token.chg1d).html}</td>
-          <td class="td-change col-7d">${fmtChg(token.chg7d).html}</td>
-          <td class="td-change col-1m">${fmtChg(token.chg1m).html}</td>
+          <td class="td-change col-1d">${fmtChg(token.chg1d, token.chg1dAbs, 'mcap').html}</td>
+          <td class="td-change col-7d">${fmtChg(token.chg7d, token.chg7dAbs, 'mcap').html}</td>
+          <td class="td-change col-1m">${fmtChg(token.chg1m, token.chg1mAbs, 'mcap').html}</td>
           <td class="td-arrow"><span class="row-arrow${isOpen ? ' open' : ''}">›</span></td>
         `;
         tr.addEventListener('click', () => toggleAccordion(token.id));
@@ -2270,12 +2335,12 @@
         const tr = document.querySelector(`.tracker-row[data-token="${token.id}"]`);
         if (!tr) return;
         tr.querySelector('.td-mcap').innerHTML    = fmtKpiMcap(token.mcap, mcapSym);
-        tr.querySelector('.col-h1d').innerHTML    = fmtChg(token.holdChg1d).html;
-        tr.querySelector('.col-h7d').innerHTML    = fmtChg(token.holdChg7d).html;
-        tr.querySelector('.col-h1m').innerHTML    = fmtChg(token.holdChg1m).html;
-        tr.querySelector('.col-1d').innerHTML     = fmtChg(token.chg1d).html;
-        tr.querySelector('.col-7d').innerHTML     = fmtChg(token.chg7d).html;
-        tr.querySelector('.col-1m').innerHTML     = fmtChg(token.chg1m).html;
+        tr.querySelector('.col-h1d').innerHTML    = fmtChg(token.holdChg1d, token.holdChg1dAbs, 'holders').html;
+        tr.querySelector('.col-h7d').innerHTML    = fmtChg(token.holdChg7d, token.holdChg7dAbs, 'holders').html;
+        tr.querySelector('.col-h1m').innerHTML    = fmtChg(token.holdChg1m, token.holdChg1mAbs, 'holders').html;
+        tr.querySelector('.col-1d').innerHTML     = fmtChg(token.chg1d, token.chg1dAbs, 'mcap').html;
+        tr.querySelector('.col-7d').innerHTML     = fmtChg(token.chg7d, token.chg7dAbs, 'mcap').html;
+        tr.querySelector('.col-1m').innerHTML     = fmtChg(token.chg1m, token.chg1mAbs, 'mcap').html;
       });
       if (openToken) {
         const titleEl = document.getElementById(`${openToken}-mcap-title`);
