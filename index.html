@@ -127,6 +127,26 @@
       margin-bottom: 1rem;
     }
 
+    /* ── Tracker view header (title + toggle) ────────────────────────────── */
+    .tracker-view-header {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .tracker-view-header .section-title { margin-bottom: 0; }
+
+    /* ── Chain table grouped header ──────────────────────────────────────── */
+    .th-group {
+      text-align: center !important;
+      border-left: 1px solid var(--border);
+      letter-spacing: 0.08em;
+    }
+    .th-group-child {
+      border-left: 1px solid var(--border);
+    }
+    .th-group-child:first-of-type { border-left: none; }
+
     /* ── Global overview ─────────────────────────────────────────────────── */
     .global-overview { margin-bottom: 2.5rem; }
 
@@ -434,6 +454,7 @@
     /* ── Tablette paysage (≤ 1199px) ────────────────────────────────────── */
     @media (max-width: 1199px) {
       .col-ticker, .col-peg, .col-mica, .col-integration { display: none; }
+      .cchain-h7d, .cchain-h1m, .cchain-mc7d, .cchain-mc1m { display: none; }
     }
 
     /* ── Tablette portrait (≤ 1023px) ───────────────────────────────────── */
@@ -442,6 +463,7 @@
       .kpi-grid       { grid-template-columns: repeat(2, 1fr); }
       .expand-inner   { grid-template-columns: 1fr; }
       .col-1m, .col-7d, .col-type, .col-issuer { display: none; }
+      .cchain-h1d, .cchain-mc1d, .cchain-native { display: none; }
     }
 
     /* ── Téléphone paysage / petite tablette (≤ 767px) ─────────────────── */
@@ -456,6 +478,7 @@
       .tracker-row td { padding: 0.85rem 0.75rem; }
       .token-logo     { width: 30px; height: 30px; }
       .chain-logo     { width: 22px; height: 22px; }
+      .cchain-tokens  { display: none; }
     }
 
     /* ── Téléphone portrait (≤ 479px) ───────────────────────────────────── */
@@ -731,7 +754,16 @@
 
   <!-- ── Token Tracker ── -->
   <div class="tracker-section">
-    <p class="section-title">Tokens</p>
+    <div class="tracker-view-header">
+      <p class="section-title">Tokens</p>
+      <div class="toggle-wrap">
+        <button class="toggle-btn active" id="btn-view-token" onclick="setTrackerView('token')">Par token</button>
+        <button class="toggle-btn" id="btn-view-chain" onclick="setTrackerView('chain')">Par blockchain</button>
+      </div>
+    </div>
+
+    <!-- ── Vue par token ── -->
+    <div id="tracker-token-view">
     <div class="card" style="padding:0; overflow-x:auto;">
       <table class="tracker-table">
         <thead>
@@ -756,6 +788,37 @@
         <tbody id="tracker-tbody"></tbody>
       </table>
     </div>
+    </div><!-- end tracker-token-view -->
+
+    <!-- ── Vue par blockchain ── -->
+    <div id="tracker-chain-view" style="display:none">
+    <div class="card" style="padding:0; overflow-x:auto;">
+      <table class="tracker-table" style="table-layout:fixed">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:36px">#</th>
+            <th rowspan="2" class="th-name" style="width:190px;text-align:left">Blockchain</th>
+            <th rowspan="2" class="cchain-native" style="width:72px">Natif</th>
+            <th rowspan="2" class="cchain-tokens" style="width:120px">Tokens</th>
+            <th colspan="4" class="th-group" style="width:328px">Holders</th>
+            <th colspan="4" class="th-group" style="width:328px">Market Cap</th>
+          </tr>
+          <tr>
+            <th class="th-right" style="width:100px">Total</th>
+            <th class="th-right cchain-h1d" style="width:64px">1J</th>
+            <th class="th-right cchain-h7d" style="width:64px">7J</th>
+            <th class="th-right cchain-h1m" style="width:64px">1M</th>
+            <th class="th-right" style="width:120px">Total</th>
+            <th class="th-right cchain-mc1d" style="width:64px">1J</th>
+            <th class="th-right cchain-mc7d" style="width:64px">7J</th>
+            <th class="th-right cchain-mc1m" style="width:64px">1M</th>
+          </tr>
+        </thead>
+        <tbody id="chain-tbody"></tbody>
+      </table>
+    </div>
+    </div><!-- end tracker-chain-view -->
+
   </div>
 
   <p id="last-updated"></p>
@@ -765,6 +828,36 @@
 
   <script>
     // ── Chain definitions ───────────────────────────────────────────────────────
+    // ── Blockchain view definitions ─────────────────────────────────────────────
+    const CHAIN_DEFS = [
+      {
+        id: 'ethereum', name: 'Ethereum', logo: './img/ethereum.png', nativeToken: 'ETH',
+        sgTokens: [
+          { logo: './img/eurcv.png', label: 'EURCV', tokenId: 'eurcv', chainIdx: 0 },
+          { logo: './img/usdcv.png', label: 'USDCV', tokenId: 'usdcv', chainIdx: 0 },
+        ],
+      },
+      {
+        id: 'solana', name: 'Solana', logo: './img/solana.png', nativeToken: 'SOL',
+        sgTokens: [
+          { logo: './img/eurcv.png', label: 'EURCV', tokenId: 'eurcv', chainIdx: 1 },
+          { logo: './img/usdcv.png', label: 'USDCV', tokenId: 'usdcv', chainIdx: 1 },
+        ],
+      },
+      {
+        id: 'xrpl', name: 'XRP Ledger', logo: './img/xrp.png', nativeToken: 'XRP',
+        sgTokens: [
+          { logo: './img/eurcv.png', label: 'EURCV', tokenId: 'eurcv', chainIdx: 2 },
+        ],
+      },
+      {
+        id: 'stellar', name: 'Stellar', logo: './img/stellar.png', nativeToken: 'XLM',
+        sgTokens: [
+          { logo: './img/eurcv.png', label: 'EURCV', tokenId: 'eurcv', chainIdx: 3 },
+        ],
+      },
+    ];
+
     const EURCV_CHAINS = [
       { label: 'Ethereum',   color: '#627EEA', mcapFile: 'data/marketcap.json',         holdersFile: 'data/holders.json' },
       { label: 'Solana',     color: '#9945FF', mcapFile: 'data/sol_marketcap.json',      holdersFile: 'data/sol_holders.json' },
@@ -1744,6 +1837,86 @@
       });
     }
 
+    function getChainRows() {
+      const isUSD      = currentCurrency === 'USD';
+      const eurcvMcKey = isUSD ? 'marketcap' : 'supply';
+      const usdcvMcKey = isUSD ? 'supply'    : 'supply_eur';
+      return CHAIN_DEFS.map(def => {
+        let mcap = 0, holders = 0;
+        const mcapInputs = [], holdInputs = [];
+        def.sgTokens.forEach(({ tokenId, chainIdx }) => {
+          const mcKey  = tokenId === 'eurcv' ? eurcvMcKey : usdcvMcKey;
+          const mData  = state[tokenId].mcapData[chainIdx];
+          const hData  = state[tokenId].holdersData[chainIdx];
+          mcap    += getLatestValue(mData, mcKey);
+          holders += getLatestValue(hData, 'holders');
+          mcapInputs.push({ series: mData, key: mcKey });
+          holdInputs.push({ series: hData, key: 'holders' });
+        });
+        const mergedMcap    = mergeSeries(mcapInputs);
+        const mergedHolders = mergeSeries(holdInputs);
+        let mcapChg1d = null, mcapChg7d = null, mcapChg1m = null;
+        let holdChg1d = null, holdChg7d = null, holdChg1m = null;
+        if (mergedMcap.length) {
+          const ld = mergedMcap[mergedMcap.length - 1].date;
+          mcapChg1d = pctChange(mcap, valueAtDate(mergedMcap, isoSubDays(ld, 1)));
+          mcapChg7d = pctChange(mcap, valueAtDate(mergedMcap, isoSubDays(ld, 7)));
+          mcapChg1m = pctChange(mcap, valueAtDate(mergedMcap, isoSubDays(ld, 30)));
+        }
+        if (mergedHolders.length) {
+          const ld = mergedHolders[mergedHolders.length - 1].date;
+          holdChg1d = pctChange(holders, valueAtDate(mergedHolders, isoSubDays(ld, 1)));
+          holdChg7d = pctChange(holders, valueAtDate(mergedHolders, isoSubDays(ld, 7)));
+          holdChg1m = pctChange(holders, valueAtDate(mergedHolders, isoSubDays(ld, 30)));
+        }
+        return { ...def, mcap, holders, mcapChg1d, mcapChg7d, mcapChg1m, holdChg1d, holdChg7d, holdChg1m };
+      });
+    }
+
+    function buildChainTable() {
+      const tbody = document.getElementById('chain-tbody');
+      if (!tbody) return;
+      const mcapSym = currentCurrency === 'USD' ? '$' : '€';
+      const rows = getChainRows().sort((a, b) => b.mcap - a.mcap);
+      tbody.innerHTML = '';
+      rows.forEach((chain, idx) => {
+        const tokenLogosHtml = chain.sgTokens.map(t =>
+          `<img src="${t.logo}" class="chain-logo" title="${t.label}" alt="${t.label}" onerror="this.style.display='none'">`
+        ).join('');
+        const tr = document.createElement('tr');
+        tr.className = 'tracker-row';
+        tr.innerHTML = `
+          <td class="td-rank">${idx + 1}</td>
+          <td class="td-name">
+            <img src="${chain.logo}" class="token-logo" alt="${chain.name}" onerror="this.style.display='none'">
+            <span class="td-name-text">${chain.name}</span>
+          </td>
+          <td class="td-ticker cchain-native">${chain.nativeToken}</td>
+          <td class="td-chains cchain-tokens"><div class="chain-logos">${tokenLogosHtml}</div></td>
+          <td class="td-holders th-right">${fmtSpaced(chain.holders)}</td>
+          <td class="td-change th-right cchain-h1d">${fmtChg(chain.holdChg1d).html}</td>
+          <td class="td-change th-right cchain-h7d">${fmtChg(chain.holdChg7d).html}</td>
+          <td class="td-change th-right cchain-h1m">${fmtChg(chain.holdChg1m).html}</td>
+          <td class="td-mcap th-right">${fmtKpiMcap(chain.mcap, mcapSym)}</td>
+          <td class="td-change th-right cchain-mc1d">${fmtChg(chain.mcapChg1d).html}</td>
+          <td class="td-change th-right cchain-mc7d">${fmtChg(chain.mcapChg7d).html}</td>
+          <td class="td-change th-right cchain-mc1m">${fmtChg(chain.mcapChg1m).html}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ── Tracker view toggle ─────────────────────────────────────────────────────
+    let currentTrackerView = 'token';
+    function setTrackerView(view) {
+      currentTrackerView = view;
+      document.getElementById('tracker-token-view').style.display = view === 'token' ? '' : 'none';
+      document.getElementById('tracker-chain-view').style.display = view === 'chain' ? '' : 'none';
+      document.getElementById('btn-view-token').classList.toggle('active', view === 'token');
+      document.getElementById('btn-view-chain').classList.toggle('active', view === 'chain');
+      if (view === 'chain') buildChainTable();
+    }
+
     function toggleSort(key) {
       if (trackerSort.key === key) {
         trackerSort.dir = trackerSort.dir === 'desc' ? 'asc' : 'desc';
@@ -1968,6 +2141,7 @@
       if (openToken) rebuildChart(openToken, 'mcap'); // accordion mcap chart: smooth in-place
       isSmoothing = false;
       refreshTrackerValues();                      // update cell values without DOM rebuild
+      if (currentTrackerView === 'chain') buildChainTable();
     }
 
     // ── Init ────────────────────────────────────────────────────────────────────
