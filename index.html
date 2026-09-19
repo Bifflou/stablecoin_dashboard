@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -665,8 +665,8 @@
     <span class="header-badge">SG Forge</span>
     <div style="display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0;">
       <div class="toggle-wrap">
-        <button class="toggle-btn" id="btn-light" onclick="setTheme('light')">☀ Jour</button>
-        <button class="toggle-btn" id="btn-dark"  onclick="setTheme('dark')">🌙 Nuit</button>
+        <button class="toggle-btn" id="btn-light" onclick="setTheme('light')">☀ Light</button>
+        <button class="toggle-btn" id="btn-dark"  onclick="setTheme('dark')">🌙 Dark</button>
       </div>
       <div class="toggle-wrap">
         <button class="toggle-btn active" id="btn-usd" onclick="setCurrency('USD')">USD</button>
@@ -692,12 +692,12 @@
 
       <div class="card">
         <div class="card-header">
-          <h2 id="global-mcap-token-title">Total Market Cap par Token (USD)</h2>
+          <h2 id="global-mcap-token-title">Total Market Cap by Token (USD)</h2>
           <div class="toggle-wrap">
-            <button class="toggle-btn active" id="global-mcap-token-btn-line" onclick="setGlobalView('mcap-token','line')" title="Courbe">
+            <button class="toggle-btn active" id="global-mcap-token-btn-line" onclick="setGlobalView('mcap-token','line')" title="Line">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <button class="toggle-btn" id="global-mcap-token-btn-pie" onclick="setGlobalView('mcap-token','pie')" title="Camembert">
+            <button class="toggle-btn" id="global-mcap-token-btn-pie" onclick="setGlobalView('mcap-token','pie')" title="Pie">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
             </button>
           </div>
@@ -707,12 +707,12 @@
 
       <div class="card">
         <div class="card-header">
-          <h2 id="global-mcap-chain-title">Total Market Cap par Chaîne (USD)</h2>
+          <h2 id="global-mcap-chain-title">Total Market Cap by Chain (USD)</h2>
           <div class="toggle-wrap">
-            <button class="toggle-btn active" id="global-mcap-chain-btn-line" onclick="setGlobalView('mcap-chain','line')" title="Courbe">
+            <button class="toggle-btn active" id="global-mcap-chain-btn-line" onclick="setGlobalView('mcap-chain','line')" title="Line">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <button class="toggle-btn" id="global-mcap-chain-btn-pie" onclick="setGlobalView('mcap-chain','pie')" title="Camembert">
+            <button class="toggle-btn" id="global-mcap-chain-btn-pie" onclick="setGlobalView('mcap-chain','pie')" title="Pie">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
             </button>
           </div>
@@ -722,12 +722,12 @@
 
       <div class="card">
         <div class="card-header">
-          <h2>Total Holders par Token</h2>
+          <h2>Total Holders by Token</h2>
           <div class="toggle-wrap">
-            <button class="toggle-btn active" id="global-holders-token-btn-line" onclick="setGlobalView('holders-token','line')" title="Courbe">
+            <button class="toggle-btn active" id="global-holders-token-btn-line" onclick="setGlobalView('holders-token','line')" title="Line">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <button class="toggle-btn" id="global-holders-token-btn-pie" onclick="setGlobalView('holders-token','pie')" title="Camembert">
+            <button class="toggle-btn" id="global-holders-token-btn-pie" onclick="setGlobalView('holders-token','pie')" title="Pie">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
             </button>
           </div>
@@ -737,12 +737,12 @@
 
       <div class="card">
         <div class="card-header">
-          <h2>Total Holders par Chaîne</h2>
+          <h2>Total Holders by Chain</h2>
           <div class="toggle-wrap">
-            <button class="toggle-btn active" id="global-holders-chain-btn-line" onclick="setGlobalView('holders-chain','line')" title="Courbe">
+            <button class="toggle-btn active" id="global-holders-chain-btn-line" onclick="setGlobalView('holders-chain','line')" title="Line">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 8,9 11,4 15,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <button class="toggle-btn" id="global-holders-chain-btn-pie" onclick="setGlobalView('holders-chain','pie')" title="Camembert">
+            <button class="toggle-btn" id="global-holders-chain-btn-pie" onclick="setGlobalView('holders-chain','pie')" title="Pie">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 8 L8 1.5 A6.5 6.5 0 1 1 2.3 11.2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 8 L8 1.5 A6.5 6.5 0 0 0 2.3 11.2 Z" fill="currentColor" opacity="0.25"/></svg>
             </button>
           </div>
@@ -751,15 +751,15 @@
       </div>
 
     </div>
-    <p class="holders-note">* Les holders peuvent être comptés plusieurs fois si présents sur plusieurs chaînes</p>
+    <p class="holders-note">* Holders may be counted multiple times if present on multiple chains</p>
   </div>
 
   <!-- ── Token Tracker ── -->
   <div class="tracker-section">
     <div class="tracker-view-header">
       <div class="toggle-wrap">
-        <button class="toggle-btn active" id="btn-view-token" onclick="setTrackerView('token')">Par token</button>
-        <button class="toggle-btn" id="btn-view-chain" onclick="setTrackerView('chain')">Par blockchain</button>
+        <button class="toggle-btn active" id="btn-view-token" onclick="setTrackerView('token')">By token</button>
+        <button class="toggle-btn" id="btn-view-chain" onclick="setTrackerView('chain')">By blockchain</button>
       </div>
       <div class="toggle-wrap toggle-chg-mode">
         <button class="toggle-btn active" id="btn-chg-pct" onclick="setChangeMode('pct')">%</button>
@@ -779,14 +779,14 @@
             <th class="col-peg" style="width:60px">Peg</th>
             <th class="col-type" style="width:96px">Type</th>
             <th class="col-mica" style="width:80px">MiCA</th>
-            <th class="col-chains" style="width:130px">Chaînes</th>
+            <th class="col-chains" style="width:130px">Chains</th>
             <th class="th-sortable th-right col-holders" data-sort="holders" style="width:100px">Holders <span class="sort-icon" id="si-holders">↕</span></th>
-            <th class="th-right col-h1d" style="width:64px">1J</th>
-            <th class="th-right col-h7d" style="width:64px">7J</th>
+            <th class="th-right col-h1d" style="width:64px">1D</th>
+            <th class="th-right col-h7d" style="width:64px">7D</th>
             <th class="th-right col-h1m" style="width:64px">1M</th>
             <th class="th-sortable th-right col-mcap" data-sort="mcap" style="width:120px">Market Cap <span class="sort-icon" id="si-mcap">↓</span></th>
-            <th class="th-right col-1d" style="width:64px">1J</th>
-            <th class="th-right col-7d" style="width:64px">7J</th>
+            <th class="th-right col-1d" style="width:64px">1D</th>
+            <th class="th-right col-7d" style="width:64px">7D</th>
             <th class="th-right col-1m" style="width:64px">1M</th>
             <th style="width:40px"></th>
           </tr>
@@ -804,15 +804,15 @@
           <tr>
             <th style="width:36px">#</th>
             <th class="th-name" style="width:190px;text-align:left">Blockchain</th>
-            <th class="cchain-native" style="width:72px">Natif</th>
+            <th class="cchain-native" style="width:72px">Native</th>
             <th class="cchain-tokens" style="width:120px">Tokens</th>
             <th class="th-right" style="width:100px">Holders</th>
-            <th class="th-right cchain-h1d" style="width:64px">1J</th>
-            <th class="th-right cchain-h7d" style="width:64px">7J</th>
+            <th class="th-right cchain-h1d" style="width:64px">1D</th>
+            <th class="th-right cchain-h7d" style="width:64px">7D</th>
             <th class="th-right cchain-h1m" style="width:64px">1M</th>
             <th class="th-right" style="width:120px">Market Cap</th>
-            <th class="th-right cchain-mc1d" style="width:64px">1J</th>
-            <th class="th-right cchain-mc7d" style="width:64px">7J</th>
+            <th class="th-right cchain-mc1d" style="width:64px">1D</th>
+            <th class="th-right cchain-mc7d" style="width:64px">7D</th>
             <th class="th-right cchain-mc1m" style="width:64px">1M</th>
             <th style="width:40px"></th>
           </tr>
@@ -826,7 +826,7 @@
 
   <p id="last-updated"></p>
   <p id="rate-warning" style="display:none; margin-top:0.4rem; font-size:0.75rem; color:#E2601A;">
-    &#9888; Taux EUR/USD approximatif (service indisponible, fallback 1.08)
+    &#9888; Approximate EUR/USD rate (service unavailable, fallback 1.08)
   </p>
 
   <script>
@@ -1468,7 +1468,7 @@
       // ── Render Card 2 — Market Cap by Chain ───────────────────────────────
       const [topChainMcap, ...otherChainsMcap] = chainMcaps.filter(c => c.value > 0);
       document.getElementById('kpi-chain-mcap').innerHTML = `
-        <div class="kpi-label">Market Cap par Chaîne (${currentCurrency})</div>
+        <div class="kpi-label">Market Cap by Chain (${currentCurrency})</div>
         ${topChainMcap ? `
           <div class="kpi-main">${fmtKpiMcap(topChainMcap.value, mcapSym)}</div>
           <div class="kpi-main-sub"><span style="color:${topChainMcap.color}">${topChainMcap.label}</span> <span class="kpi-row-pct">(${pct(topChainMcap.value, grandMcap)})</span></div>
@@ -1487,7 +1487,7 @@
       document.getElementById('kpi-total-holders').innerHTML = `
         <div class="kpi-label">Total Holders</div>
         <div class="kpi-main">${fmtSpaced(grandHolders)}</div>
-        <div class="kpi-note-tiny">* comptage cross-chaîne non dédupliqué</div>
+        <div class="kpi-note-tiny">* non-deduplicated cross-chain count</div>
         <div class="kpi-details">
           ${TOKEN_META.map((t, i) => {
             const val = i === 0 ? eurcvHoldTotal : usdcvHoldTotal;
@@ -1503,7 +1503,7 @@
       // ── Render Card 4 — Holders by Chain ──────────────────────────────────
       const [topChainH, ...othersH] = chainHolders.filter(c => c.value > 0);
       document.getElementById('kpi-chain-holders').innerHTML = `
-        <div class="kpi-label">Holders par Chaîne</div>
+        <div class="kpi-label">Holders by Chain</div>
         ${topChainH ? `
           <div class="kpi-main">${fmtSpaced(topChainH.value)}</div>
           <div class="kpi-main-sub"><span style="color:${topChainH.color}">${topChainH.label}</span> <span class="kpi-row-pct">(${pct(topChainH.value, grandHolders)})</span></div>
@@ -1619,8 +1619,8 @@
       const fmtMcAxis  = isUSD ? fmtAxisUSD : fmtAxisEUR;
       const mcapLabel  = isUSD ? 'USD' : 'EUR';
 
-      document.getElementById('global-mcap-token-title').textContent = `Total Market Cap par Token (${mcapLabel})`;
-      document.getElementById('global-mcap-chain-title').textContent = `Total Market Cap par Chaîne (${mcapLabel})`;
+      document.getElementById('global-mcap-token-title').textContent = `Total Market Cap by Token (${mcapLabel})`;
+      document.getElementById('global-mcap-chain-title').textContent = `Total Market Cap by Chain (${mcapLabel})`;
 
       // ── Market Cap by Token ─────────────────────────────────────────────────
       const eurcvMcapTotal = mergeSeries(state.eurcv.mcapData.map(s => ({ series: s, key: eurcvMcKey })));
@@ -1706,7 +1706,7 @@
           );
           s.mcapChart.update();
           const titleEl = document.getElementById(`${token}-mcap-title`);
-          if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+          if (titleEl) titleEl.textContent = `Market Capitalization (${currentCurrency})`;
           return;
         }
 
@@ -1719,7 +1719,7 @@
           s.mcapChart = buildPieChart(canvasId, s.mcapData, chains, valueKey, fmtVal);
         }
         const titleEl = document.getElementById(`${token}-mcap-title`);
-        if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+        if (titleEl) titleEl.textContent = `Market Capitalization (${currentCurrency})`;
 
       } else {
         if (s.holdersChart) { s.holdersChart.destroy(); s.holdersChart = null; }
@@ -1756,9 +1756,9 @@
         id: 'eurcv', name: 'EUR CoinVertible', ticker: 'EURCV',
         peg: { symbol: '€', code: 'EUR' },
         issuer: 'SG Forge',
-        type: 'Centralisé',
-        mica: 'Oui',
-        integration: 'Natif',
+        type: 'Centralized',
+        mica: 'Yes',
+        integration: 'Native',
         logo: './img/eurcv.png',
         chainDefs: EURCV_CHAINS,
         chainLogos: [
@@ -1772,9 +1772,9 @@
         id: 'usdcv', name: 'USD CoinVertible', ticker: 'USDCV',
         peg: { symbol: '$', code: 'USD' },
         issuer: 'SG Forge',
-        type: 'Centralisé',
-        mica: 'Oui',
-        integration: 'Natif',
+        type: 'Centralized',
+        mica: 'Yes',
+        integration: 'Native',
         logo: './img/usdcv.png',
         chainDefs: USDCV_CHAINS,
         chainLogos: [
@@ -1959,20 +1959,20 @@
       return `
         <div class="expand-chart-card">
           <div class="card-header">
-            <h2 id="${chainId}-chain-mcap-title">Market Capitalisation (${currency})</h2>
+            <h2 id="${chainId}-chain-mcap-title">Market Capitalization (${currency})</h2>
             <div class="toggle-wrap">
-              <button class="toggle-btn active" id="${chainId}-chain-mcap-btn-line" onclick="setChainView('${chainId}','mcap','line')" title="Courbe">${SVG_LINE}</button>
-              <button class="toggle-btn"        id="${chainId}-chain-mcap-btn-pie"  onclick="setChainView('${chainId}','mcap','pie')"  title="Camembert">${SVG_PIE}</button>
+              <button class="toggle-btn active" id="${chainId}-chain-mcap-btn-line" onclick="setChainView('${chainId}','mcap','line')" title="Line">${SVG_LINE}</button>
+              <button class="toggle-btn"        id="${chainId}-chain-mcap-btn-pie"  onclick="setChainView('${chainId}','mcap','pie')"  title="Pie">${SVG_PIE}</button>
             </div>
           </div>
           <div class="chart-wrap"><canvas id="chart-${chainId}-chain-mcap"></canvas></div>
         </div>
         <div class="expand-chart-card">
           <div class="card-header">
-            <h2>Nombre de Holders</h2>
+            <h2>Number of Holders</h2>
             <div class="toggle-wrap">
-              <button class="toggle-btn active" id="${chainId}-chain-holders-btn-line" onclick="setChainView('${chainId}','holders','line')" title="Courbe">${SVG_LINE}</button>
-              <button class="toggle-btn"        id="${chainId}-chain-holders-btn-pie"  onclick="setChainView('${chainId}','holders','pie')"  title="Camembert">${SVG_PIE}</button>
+              <button class="toggle-btn active" id="${chainId}-chain-holders-btn-line" onclick="setChainView('${chainId}','holders','line')" title="Line">${SVG_LINE}</button>
+              <button class="toggle-btn"        id="${chainId}-chain-holders-btn-pie"  onclick="setChainView('${chainId}','holders','pie')"  title="Pie">${SVG_PIE}</button>
             </div>
           </div>
           <div class="chart-wrap"><canvas id="chart-${chainId}-chain-holders"></canvas></div>
@@ -2010,7 +2010,7 @@
           s.mcapChart.options.plugins.tooltip.external = makeTooltipHandler(fmtVal, stacked.paired, eurusdRates, stacked.rawDates);
           s.mcapChart.update();
           const titleEl = document.getElementById(`${chainId}-chain-mcap-title`);
-          if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+          if (titleEl) titleEl.textContent = `Market Capitalization (${currentCurrency})`;
           return;
         }
 
@@ -2022,7 +2022,7 @@
           s.mcapChart = buildPieChart(canvasId, series, chains, 'val', fmtVal);
         }
         const titleEl = document.getElementById(`${chainId}-chain-mcap-title`);
-        if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+        if (titleEl) titleEl.textContent = `Market Capitalization (${currentCurrency})`;
 
       } else {
         const fmtVal  = v => fmtSpaced(v) + ' holders';
@@ -2185,20 +2185,20 @@
       return `
         <div class="expand-chart-card">
           <div class="card-header">
-            <h2 id="${id}-mcap-title">Market Capitalisation (${currency})</h2>
+            <h2 id="${id}-mcap-title">Market Capitalization (${currency})</h2>
             <div class="toggle-wrap">
-              <button class="toggle-btn active" id="${id}-mcap-btn-line" onclick="setView('${id}','mcap','line')" title="Courbe">${SVG_LINE}</button>
-              <button class="toggle-btn"        id="${id}-mcap-btn-pie"  onclick="setView('${id}','mcap','pie')"  title="Camembert">${SVG_PIE}</button>
+              <button class="toggle-btn active" id="${id}-mcap-btn-line" onclick="setView('${id}','mcap','line')" title="Line">${SVG_LINE}</button>
+              <button class="toggle-btn"        id="${id}-mcap-btn-pie"  onclick="setView('${id}','mcap','pie')"  title="Pie">${SVG_PIE}</button>
             </div>
           </div>
           <div class="chart-wrap"><canvas id="chart-${id}-mcap"></canvas></div>
         </div>
         <div class="expand-chart-card">
           <div class="card-header">
-            <h2>Nombre de Holders</h2>
+            <h2>Number of Holders</h2>
             <div class="toggle-wrap">
-              <button class="toggle-btn active" id="${id}-holders-btn-line" onclick="setView('${id}','holders','line')" title="Courbe">${SVG_LINE}</button>
-              <button class="toggle-btn"        id="${id}-holders-btn-pie"  onclick="setView('${id}','holders','pie')"  title="Camembert">${SVG_PIE}</button>
+              <button class="toggle-btn active" id="${id}-holders-btn-line" onclick="setView('${id}','holders','line')" title="Line">${SVG_LINE}</button>
+              <button class="toggle-btn"        id="${id}-holders-btn-pie"  onclick="setView('${id}','holders','pie')"  title="Pie">${SVG_PIE}</button>
             </div>
           </div>
           <div class="chart-wrap"><canvas id="chart-${id}-holders"></canvas></div>
@@ -2247,7 +2247,7 @@
           <td class="td-ticker col-type">${token.type || '—'}</td>
           <td class="td-ticker col-mica">${token.mica || '—'}</td>
           <td class="td-chains col-chains">${chainLogosHtml}</td>
-          <td class="td-holders col-holders" title="* Comptage non dédupliqué cross-chaîne">${fmtSpaced(token.holders)}<span class="holders-star">*</span></td>
+          <td class="td-holders col-holders" title="* Non-deduplicated cross-chain count">${fmtSpaced(token.holders)}<span class="holders-star">*</span></td>
           <td class="td-change col-h1d">${fmtChg(token.holdChg1d, token.holdChg1dAbs, 'holders').html}</td>
           <td class="td-change col-h7d">${fmtChg(token.holdChg7d, token.holdChg7dAbs, 'holders').html}</td>
           <td class="td-change col-h1m">${fmtChg(token.holdChg1m, token.holdChg1mAbs, 'holders').html}</td>
@@ -2367,7 +2367,7 @@
       });
       if (openToken) {
         const titleEl = document.getElementById(`${openToken}-mcap-title`);
-        if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+        if (titleEl) titleEl.textContent = `Market Capitalization (${currentCurrency})`;
       }
     }
 
@@ -2388,7 +2388,7 @@
       });
       if (openChain) {
         const titleEl = document.getElementById(`${openChain}-chain-mcap-title`);
-        if (titleEl) titleEl.textContent = `Market Capitalisation (${currentCurrency})`;
+        if (titleEl) titleEl.textContent = `Market Capitalization (${currentCurrency})`;
       }
     }
 
@@ -2438,7 +2438,7 @@
       buildTrackerTable();
 
       document.getElementById('last-updated').textContent =
-        'Dernière mise à jour : ' + new Date().toLocaleString('fr-FR', { timeZone: 'UTC' }) + ' UTC';
+        'Last updated: ' + new Date().toLocaleString('en-GB', { timeZone: 'UTC' }) + ' UTC';
     }
 
     init();
