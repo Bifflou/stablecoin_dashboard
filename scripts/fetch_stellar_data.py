@@ -10,7 +10,13 @@ from datetime import datetime, timezone, timedelta
 ISSUER        = "GCEYGIVOLAVBF2TG2RUSGTUJCIN75KEX3NGLMY4VPL4GFE5L355AXW3G"
 ADMIN         = "GCYYFR4SR4RDSWTN64LSE4BGF2UQEDYZ32QTD7TMQXO6TXSGEDWP652D"
 ASSET_CODE    = "EURCV"
-HORIZON       = "https://horizon.stellar.org"
+# Fallback list — tried in order until one responds
+HORIZON_ENDPOINTS = [
+    "https://horizon.stellar.org",
+    "https://horizon.stellar.lobstr.co",
+    "https://horizon-mainnet.stellar.gateway.fm",
+]
+HORIZON       = HORIZON_ENDPOINTS[0]
 EXPERT_BASE   = "https://api.stellar.expert"
 EXPERT        = f"{EXPERT_BASE}/explorer/public/asset/{ASSET_CODE}-{ISSUER}"
 STELLAR_SCALE = 10 ** 7
@@ -32,6 +38,39 @@ def save_json(path, data):
 
 def iso_to_date(iso):
     return iso[:10]
+
+
+# ── HTTP helpers (retry + Horizon failover) ────────────────────────────────────
+
+def get_with_retry(url, params=None, timeout=30, max_retries=3):
+    """GET with exponential backoff; raises on permanent failure."""
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait = 5 * (2 ** attempt)
+                print(f"  [retry {attempt+1}/{max_retries}] {e} — retrying in {wait}s")
+                time.sleep(wait)
+            else:
+                raise
+
+
+def pick_horizon():
+    """Return the first Horizon endpoint that responds to a simple health check."""
+    global HORIZON
+    for endpoint in HORIZON_ENDPOINTS:
+        try:
+            resp = requests.get(endpoint, timeout=10)
+            if resp.status_code < 500:
+                HORIZON = endpoint
+                print(f"  Horizon actif : {endpoint}")
+                return endpoint
+        except requests.exceptions.RequestException:
+            print(f"  Horizon injoignable : {endpoint}")
+    raise RuntimeError("Aucun endpoint Horizon disponible")
 
 
 # ── ScVal decoding (supply only — symbol + i128/u128) ──────────────────────────
@@ -65,9 +104,7 @@ def decode_scval(b64):
 # ── Current state (stellar.expert) ─────────────────────────────────────────────
 
 def get_asset_info():
-    resp = requests.get(EXPERT, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    return get_with_retry(EXPERT, timeout=30).json()
 
 
 def get_current_supply_and_holders():
@@ -76,9 +113,7 @@ def get_current_supply_and_holders():
     holder_count = 0
     url = f"{EXPERT}/holders"
     while True:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
+        data = get_with_retry(url, timeout=30).json()
         records = data.get("_embedded", {}).get("records", [])
         for r in records:
             bal = float(r.get("balance", 0)) / STELLAR_SCALE
@@ -110,9 +145,7 @@ def get_account_operations_since(account, cursor=None, label="account"):
     use_params = True
     page = 1
     while True:
-        resp = requests.get(url, params=(params if use_params else None), timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
+        data = get_with_retry(url, params=(params if use_params else None), timeout=30).json()
         records = data.get("_embedded", {}).get("records", [])
         all_ops.extend(records)
         if records:
@@ -290,9 +323,7 @@ def build_holders_snapshot(ops, prev_balances=None):
 
 def fetch_eur_usd_rates(start_date):
     url = f"https://api.frankfurter.app/{start_date}.."
-    resp = requests.get(url, params={"from": "EUR", "to": "USD"}, timeout=30)
-    resp.raise_for_status()
-    return {d: r["USD"] for d, r in resp.json().get("rates", {}).items()}
+    return {d: r["USD"] for d, r in get_with_retry(url, params={"from": "EUR", "to": "USD"}, timeout=30).json().get("rates", {}).items()}
 
 
 def compute_marketcap(supply_history, eur_usd_rates):
@@ -317,6 +348,9 @@ def compute_marketcap(supply_history, eur_usd_rates):
 def main():
     os.makedirs("data", exist_ok=True)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    print("Sélection endpoint Horizon...")
+    pick_horizon()
 
     print("Récupération métadonnées asset via stellar.expert...")
     asset_info = get_asset_info()
